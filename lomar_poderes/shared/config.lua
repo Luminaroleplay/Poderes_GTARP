@@ -116,3 +116,48 @@ Config.Crucificacao = {
     DuracaoMs = 8000,
     Altura = 1.6
 }
+
+-- Poderes Criativos & Originais (LOMAR DEV)
+Config.Telecinese = {
+    Distancia = 25.0,
+    DuracaoSegurar = 7000,
+    ForcaArremesso = 50.0
+}
+
+Config.EscudoMistico = {
+    DuracaoMs = 10000,
+    RaioEmpurrao = 3.5
+}
+
+Config.ClonesSombra = {
+    Quantidade = 2,
+    DuracaoMs = 10000
+}
+
+Config.BuracoNegro = {
+    DistanciaMira = 40.0,
+    RaioSugador = 20.0,
+    DuracaoMs = 6000,
+    ForcaExplosao = 1.2
+}
+
+Config.FormaFantasma = {
+    DuracaoMs = 10000,
+    TransparenciaAlpha = 110,
+    VelocidadeBonus = 1.45
+}
+
+Config.Criomancia = {
+    Distancia = 12.0,
+    DuracaoMs = 8000
+}
+
+Config.PuxaoSombrio = {
+    Distancia = 25.0,
+    VelocidadeArrasto = 25.0
+}
+
+Config.ParadaTemporal = {
+    Raio = 30.0,
+    DuracaoMs = 6000
+}

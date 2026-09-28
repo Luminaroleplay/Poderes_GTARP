@@ -1,11 +1,11 @@
 ================================================================================
-   PACOTE COMPLETO DE PODERES SOBRENATURAIS & FORMAS LUPINAS v4.0
+   PACOTE COMPLETO DE PODERES SOBRENATURAIS & FORMAS LUPINAS v5.0
    Desenvolvido e adaptado por: LOMAR DEV
    Comunidade: MRI Community
 ================================================================================
 
 Este pacote contem:
-1. lomar_poderes         -> Script completo com 22 poderes sobrenaturais, animacoes personalizadas, audio NUI e particulas sincronizadas em rede (LOMAR DEV)
+1. lomar_poderes         -> Script completo com 34 poderes sobrenaturais, animacoes personalizadas, audio NUI e particulas sincronizadas em rede (LOMAR DEV)
 2. Lupino_Lumina         -> Modelo 3D da fera Lobisomem gigante (WereWolf) com 400 HP e super forca (LOMAR DEV)
 3. Lobo_Sirius_Lumina    -> Modelo 3D do Lobo Sirius de 4 patas ágil e veloz (LOMAR DEV)
 
@@ -40,41 +40,58 @@ TRANSFORMAÇÕES LUPINAS:
                                     e reproduzindo o rugido da fera para todos ao redor
 5.  /visaolobo                   -> Ativa ou desativa a visão noturna feral do lobo
 
+PODERES CRIATIVOS & ARCANOS AVANÇADOS:
+6.  /telecinese                  -> Mire em um carro ou pessoa para erguê-lo no ar levitando;
+                                    use /telecinese novamente para arremessá-lo com força devastadora!
+7.  /escudo                      -> Cria uma cúpula mágica de partículas ao redor do seu corpo por 10s:
+                                    imunidade total a tiros e empurra com força quem tentar encostar
+8.  /clones                      -> Invoca 2 cópias idênticas a você que correm em direções opostas
+                                    para despistar inimigos e a polícia
+9.  /buraconegro                 -> Cria um vórtex de gravidade singular no chão que suga pessoas,
+                                    carros e objetos para o centro antes de liberar uma explosão
+10. /fantasma                    -> Transforma seu corpo em forma espectral translúcida (invisibilidade parcial),
+                                    imune a dano e com velocidade aumentada por 10s
+11. /congelar [id]               -> Dispara uma rajada gélida de criomancia que congela a tela do alvo
+                                    e o deixa totalmente imóvel no solo por 8 segundos
+12. /puxar [id]                  -> Lança correntes sombrias que arrastam a vítima pelo ar direto até você
+13. /parartempo                  -> Para o fluxo temporal ao seu redor: congela todos os jogadores e NPCs
+                                    próximos por 6 segundos enquanto só você se move!
+
 PODERES DE VIDA, MORTE & SANGUE:
-6.  /renascer ou /reviver [id]   -> Ressuscitação celestial: o conjurador ajoelha em prece,
+14. /renascer ou /reviver [id]   -> Ressuscitação celestial: o conjurador ajoelha em prece,
                                     a vítima abatida levita com aura angelical (angel.ogg)
                                     e é revivida com vida cheia e ferimentos limpos
-7.  /beijodamorte [id]           -> O vampiro drena a essência vital da vítima próxima com
+15. /beijodamorte [id]           -> O vampiro drena a essência vital da vítima próxima com
                                     esguicho de sangue, causando 50 de dano e restaurando
                                     completamente a vida e colete do vampiro
-8.  /morder ou /alimentar        -> Mordida sincronizada de vampiro que drena vida
-9.  /olhos_vampiro               -> Visão noturna sombria de predador
-10. /velocidade_vampiro          -> Arrancada veloz com rastro escuro por 12s
+16. /morder ou /alimentar        -> Mordida sincronizada de vampiro que drena vida
+17. /olhos_vampiro               -> Visão noturna sombria de predador
+18. /velocidade_vampiro          -> Arrancada veloz com rastro escuro por 12s
 
 PODERES ELEMENTAIS & MÍSTICOS:
-11. /canto_sereia [id] /hipnose  -> Canto hipnótico da sereia: deixa alvos próximos em transe,
+19. /canto_sereia [id] /hipnose  -> Canto hipnótico da sereia: deixa alvos próximos em transe,
                                     tropeçando desorientados com a visão embriagada
-12. /respiracao ou /sereia       -> Nado veloz, fôlego infinito e proteção na água
-13. /petrificar [id]             -> Canaliza a força da terra: petrifica o alvo transformando-o
+20. /respiracao ou /sereia       -> Nado veloz, fôlego infinito e proteção na água
+21. /petrificar [id]             -> Canaliza a força da terra: petrifica o alvo transformando-o
                                     numa estátua de pedra sólida e imóvel por 10 segundos
-14. /ataquemental [id] /psiquico -> Dispara uma rajada telepática na mente da vítima, causando
+22. /ataquemental [id] /psiquico -> Dispara uma rajada telepática na mente da vítima, causando
                                     agonia, dano psíquico e visão perturbada
-15. /luzdivina ou /purificar     -> Invoca um resplendor de luz celestial que cega e desorienta
+23. /luzdivina ou /purificar     -> Invoca um resplendor de luz celestial que cega e desorienta
                                     inimigos na área
-16. /prisao_agua [id] ou /afogar -> Envolve o alvo numa esfera de água mágica, fazendo-o nadar
+24. /prisao_agua [id] ou /afogar -> Envolve o alvo numa esfera de água mágica, fazendo-o nadar
                                     no ar e se afogar no seco sofrendo dano
-17. /tornado ou /vendaval        -> Cria um vórtice violento de vento que derruba e arremessa
+25. /tornado ou /vendaval        -> Cria um vórtice violento de vento que derruba e arremessa
                                     todos ao redor ao chão (ragdoll)
-18. /crucificar [id]             -> Suspende a vítima a 1.6m do chão numa crucificação arcana,
+26. /crucificar [id]             -> Suspende a vítima a 1.6m do chão numa crucificação arcana,
                                     deixando-a totalmente imobilizada e indefesa
-19. /tpmagico ou /tpcast         -> Teleporte com mira no chão, raio e trovão
-20. /levitar ou /levitate        -> Flutua e medita no ar (aperte E para descer)
-21. /magia_fogo ou /flametest    -> Lança-chamas mágico pelas mãos (aperte E para usar)
-22. /fumaca ou /desaparecer      -> Explosão de névoa mística e trevas
-23. /raio ou /tempestade         -> Invoca raio real do céu com mira no chão
-24. /terremoto                   -> Faz a terra tremer com estrondo de terremoto
-25. /risada ou /aterrorizar      -> Risada demoníaca que aterroriza quem estiver perto
-26. /fire [id]                   -> (Admin) Ateia fogo mágico no jogador alvo
+27. /tpmagico ou /tpcast         -> Teleporte com mira no chão, raio e trovão
+28. /levitar ou /levitate        -> Flutua e medita no ar (aperte E para descer)
+29. /magia_fogo ou /flametest    -> Lança-chamas mágico pelas mãos (aperte E para usar)
+30. /fumaca ou /desaparecer      -> Explosão de névoa mística e trevas
+31. /raio ou /tempestade         -> Invoca raio real do céu com mira no chão
+32. /terremoto                   -> Faz a terra tremer com estrondo de terremoto
+33. /risada ou /aterrorizar      -> Risada demoníaca que aterroriza quem estiver perto
+34. /fire [id]                   -> (Admin) Ateia fogo mágico no jogador alvo
 
 --------------------------------------------------------------------------------
 CONFIGURACOES (shared/config.lua):

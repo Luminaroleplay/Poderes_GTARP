@@ -1405,3 +1405,446 @@ RegisterNetEvent('lumina_poderes:client:receiveCrucifixion', function(duration)
     Notify('Crucificação', 'A cruz invisível se desfez.', 'inform')
 end)
 
+-- =========================================================================
+-- 22. TELECINESE AVANÇADA (LOMAR DEV)
+-- =========================================================================
+local telekinesisEntity = nil
+local telekinesisActive = false
+
+local function RotationToDirection(rotation)
+    local z = math.rad(rotation.z)
+    local x = math.rad(rotation.x)
+    local num = math.abs(math.cos(x))
+    return vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
+end
+
+local function GetEntityInFrontOfPlayer(maxDist)
+    local ped = PlayerPedId()
+    local coords = GetGameplayCamCoord()
+    local rot = GetGameplayCamRot(2)
+    local forward = RotationToDirection(rot)
+    local target = coords + (forward * maxDist)
+
+    local ray = StartShapeTestRay(coords.x, coords.y, coords.z, target.x, target.y, target.z, -1, ped, 0)
+    local _, hit, _, _, entity = GetShapeTestResult(ray)
+
+    if hit and DoesEntityExist(entity) and entity ~= ped then
+        return entity
+    end
+    return nil
+end
+
+RegisterCommand('telecinese', function()
+    local ped = PlayerPedId()
+
+    if telekinesisActive and telekinesisEntity and DoesEntityExist(telekinesisEntity) then
+        local camRot = GetGameplayCamRot(2)
+        local forward = RotationToDirection(camRot)
+        local force = Config.Telecinese.ForcaArremesso or 50.0
+
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_teleport_aln", 8.0, -8.0, 1000, 49, 0, false, false, false)
+        PlaySpellSound("thunder", 0.7)
+
+        if IsEntityAVehicle(telekinesisEntity) then
+            SetVehicleForwardSpeed(telekinesisEntity, force)
+            ApplyForceToEntity(telekinesisEntity, 1, forward.x * force, forward.y * force, forward.z * force + 5.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        elseif IsEntityAPed(telekinesisEntity) then
+            if IsPedAPlayer(telekinesisEntity) then
+                local sId = GetPlayerServerId(NetworkGetPlayerIndexFromPed(telekinesisEntity))
+                TriggerServerEvent('lumina_poderes:server:syncTelekinesisThrow', sId, forward.x * force, forward.y * force, forward.z * force + 5.0)
+            else
+                SetPedToRagdoll(telekinesisEntity, 4000, 4000, 0, 0, 0, 0)
+                ApplyForceToEntity(telekinesisEntity, 1, forward.x * force, forward.y * force, forward.z * force + 5.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+            end
+        end
+
+        Notify('Telecinese', 'Você ARREMESSOU o alvo com a mente!', 'success')
+        telekinesisActive = false
+        telekinesisEntity = nil
+        return
+    end
+
+    local ent = GetEntityInFrontOfPlayer(Config.Telecinese.Distancia or 25.0)
+    if not ent then
+        Notify('Telecinese', 'Mire em um veículo ou pessoa para erguer com a mente.', 'error')
+        return
+    end
+
+    telekinesisEntity = ent
+    telekinesisActive = true
+
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, -1, 49, 0, false, false, false)
+    PlaySpellSound("mental", 0.8)
+    Notify('Telecinese', 'Alvo LEVITADO! Use /telecinese novamente para arremessá-lo!', 'success')
+
+    CreateThread(function()
+        local startTime = GetGameTimer()
+        local maxDuration = Config.Telecinese.DuracaoSegurar or 7000
+
+        while telekinesisActive and (GetGameTimer() - startTime) < maxDuration and DoesEntityExist(telekinesisEntity) do
+            local pCoords = GetEntityCoords(PlayerPedId())
+            local cRot = GetGameplayCamRot(2)
+            local forward = RotationToDirection(cRot)
+            local holdPos = pCoords + (forward * 8.0) + vector3(0.0, 0.0, 2.5)
+
+            if IsEntityAVehicle(telekinesisEntity) then
+                SetEntityVelocity(telekinesisEntity, 0.0, 0.0, 0.1)
+                SetEntityCoords(telekinesisEntity, holdPos.x, holdPos.y, holdPos.z, false, false, false, false)
+            elseif IsEntityAPed(telekinesisEntity) then
+                SetEntityCoords(telekinesisEntity, holdPos.x, holdPos.y, holdPos.z, false, false, false, false)
+            end
+
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("ent_ray_prologue_elec_crackle", holdPos.x, holdPos.y, holdPos.z, 0.0, 0.0, 0.0, 0.6, false, false, false)
+            Wait(10)
+        end
+
+        if telekinesisActive then
+            telekinesisActive = false
+            telekinesisEntity = nil
+            ClearPedTasks(PlayerPedId())
+            Notify('Telecinese', 'O controle telecinético expirou.', 'inform')
+        end
+    end)
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveTelekinesisThrow', function(forceX, forceY, forceZ)
+    local ped = PlayerPedId()
+    SetPedToRagdoll(ped, 4000, 4000, 0, 0, 0, 0)
+    ApplyForceToEntity(ped, 1, forceX, forceY, forceZ, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+    ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.8)
+    Notify('Telecinese', 'Você foi arremessado por uma força invisível!', 'error')
+end)
+
+-- =========================================================================
+-- 23. ESCUDO MÍSTICO / CÚPULA PROTETORA (LOMAR DEV)
+-- =========================================================================
+local shieldActive = false
+
+RegisterCommand('escudo', function()
+    local ped = PlayerPedId()
+
+    if shieldActive then
+        Notify('Escudo Místico', 'O escudo já está ativado.', 'error')
+        return
+    end
+
+    shieldActive = true
+    PlaySpellSound("lux", 0.9)
+    SetEntityInvincible(ped, true)
+    SetPedCanRagdoll(ped, false)
+    SetPedArmour(ped, 100)
+
+    Notify('Escudo Místico', 'Cúpula mágica ativada! Imunidade e repelência ativas por 10s.', 'success')
+
+    CreateThread(function()
+        local duration = Config.EscudoMistico.DuracaoMs or 10000
+        local startTime = GetGameTimer()
+
+        while (GetGameTimer() - startTime) < duration and shieldActive do
+            local coords = GetEntityCoords(ped)
+
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("veh_respray_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
+
+            local closestP, dist = GetClosestPlayer()
+            if closestP ~= -1 and dist <= (Config.EscudoMistico.RaioEmpurrao or 3.5) then
+                local tPed = GetPlayerPed(closestP)
+                local tCoords = GetEntityCoords(tPed)
+                local pushDir = tCoords - coords
+                SetPedToRagdoll(tPed, 2000, 2000, 0, 0, 0, 0)
+                ApplyForceToEntity(tPed, 1, pushDir.x * 10.0, pushDir.y * 10.0, 3.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+            end
+
+            Wait(250)
+        end
+
+        shieldActive = false
+        SetEntityInvincible(ped, false)
+        SetPedCanRagdoll(ped, true)
+        PlaySpellSound("dirt", 0.6)
+        Notify('Escudo Místico', 'A cúpula mística se desvaneceu.', 'inform')
+    end)
+end, false)
+
+-- =========================================================================
+-- 24. CLONES DE ILUSÃO / SOMBRAS (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('clones', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    PlaySpellSound("demon", 0.8)
+    RequestNamedPtfxAsset("core")
+    while not HasNamedPtfxAssetLoaded("core") do Wait(10) end
+    UseParticleFxAssetNextCall("core")
+    StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 2.0, false, false, false)
+
+    local clonePeds = {}
+    local angles = { 90.0, 270.0 }
+
+    for i = 1, (Config.ClonesSombra.Quantidade or 2) do
+        local clone = ClonePed(ped, false, false, false)
+        if DoesEntityExist(clone) then
+            SetEntityInvincible(clone, true)
+            SetPedCanRagdoll(clone, false)
+            SetBlockingOfNonTemporaryEvents(clone, true)
+
+            local angle = angles[i] or (i * 120.0)
+            local h = GetEntityHeading(ped) + angle
+            SetEntityHeading(clone, h)
+
+            local runTarget = coords + vector3(math.sin(math.rad(-h)) * 40.0, math.cos(math.rad(-h)) * 40.0, 0.0)
+            TaskGoStraightToCoord(clone, runTarget.x, runTarget.y, runTarget.z, 3.0, -1, 0.0, 0.0)
+
+            table.insert(clonePeds, clone)
+        end
+    end
+
+    Notify('Clones', 'Você invocou sombras para despistar seus inimigos!', 'success')
+
+    SetTimeout(Config.ClonesSombra.DuracaoMs or 10000, function()
+        for _, clone in ipairs(clonePeds) do
+            if DoesEntityExist(clone) then
+                local cCoords = GetEntityCoords(clone)
+                UseParticleFxAssetNextCall("core")
+                StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", cCoords.x, cCoords.y, cCoords.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
+                DeleteEntity(clone)
+            end
+        end
+    end)
+end, false)
+
+-- =========================================================================
+-- 25. BURACO NEGRO / VÓRTICE GRAVITACIONAL (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('buraconegro', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped) + (GetEntityForwardVector(ped) * 15.0)
+
+    RequestAnim("gx_s06@animation")
+    if HasAnimDictLoaded("gx_s06@animation") then
+        TaskPlayAnim(ped, "gx_s06@animation", "gx_s06_clip", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("demon", 0.9)
+    TriggerServerEvent('lumina_poderes:server:syncBlackHole', coords)
+    Notify('Buraco Negro', 'Você invocou um vórtex de gravidade singular!', 'success')
+    Wait(3000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveBlackHole', function(coords)
+    local ped = PlayerPedId()
+    local duration = Config.BuracoNegro.DuracaoMs or 6000
+    local startTime = GetGameTimer()
+
+    PlaySpellSound("tornado", 0.8)
+    ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 0.8)
+
+    CreateThread(function()
+        while (GetGameTimer() - startTime) < duration do
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 2.8, false, false, false)
+
+            local pCoords = GetEntityCoords(ped)
+            local dist = #(coords - pCoords)
+
+            if dist > 1.5 and dist <= (Config.BuracoNegro.RaioSugador or 20.0) then
+                local dir = coords - pCoords
+                local pullForce = 15.0 / math.max(1.0, dist)
+                ApplyForceToEntity(ped, 1, dir.x * pullForce, dir.y * pullForce, dir.z * pullForce + 0.5, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+            end
+
+            Wait(150)
+        end
+
+        AddExplosion(coords.x, coords.y, coords.z, 2, 0.0, true, false, 1.0)
+        ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.2)
+        local endCoords = GetEntityCoords(ped)
+        local endDist = #(coords - endCoords)
+        if endDist <= 15.0 then
+            SetPedToRagdoll(ped, 4000, 4000, 0, 0, 0, 0)
+        end
+    end)
+end)
+
+-- =========================================================================
+-- 26. FORMA FANTASMA / INTANGIBILIDADE (LOMAR DEV)
+-- =========================================================================
+local isGhostActive = false
+
+RegisterCommand('fantasma', function()
+    local ped = PlayerPedId()
+    local pedId = PlayerId()
+
+    if isGhostActive then
+        Notify('Forma Fantasma', 'Você já está na forma espectral.', 'error')
+        return
+    end
+
+    isGhostActive = true
+    PlaySpellSound("mental", 0.8)
+    SetEntityAlpha(ped, Config.FormaFantasma.TransparenciaAlpha or 110, false)
+    SetEntityInvincible(ped, true)
+    SetPedCanRagdoll(ped, false)
+    SetRunSprintMultiplierForPlayer(pedId, Config.FormaFantasma.VelocidadeBonus or 1.45)
+
+    Notify('Forma Fantasma', 'Você se tornou espectral! Invisível a radares e imune a balas por 10s.', 'success')
+
+    CreateThread(function()
+        local duration = Config.FormaFantasma.DuracaoMs or 10000
+        local startTime = GetGameTimer()
+
+        while (GetGameTimer() - startTime) < duration and isGhostActive do
+            ResetPlayerStamina(pedId)
+            local coords = GetEntityCoords(ped)
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("veh_respray_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 0.5, false, false, false)
+            Wait(200)
+        end
+
+        isGhostActive = false
+        ResetEntityAlpha(ped)
+        SetEntityInvincible(ped, false)
+        SetPedCanRagdoll(ped, true)
+        SetRunSprintMultiplierForPlayer(pedId, 1.0)
+        PlaySpellSound("mental", 0.5)
+        Notify('Forma Fantasma', 'Você materializou seu corpo novamente.', 'inform')
+    end)
+end, false)
+
+-- =========================================================================
+-- 27. CRIOMANCIA / CONGELAMENTO (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('congelar', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.Criomancia.Distancia or 12.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Criomancia', 'Nenhum alvo ao alcance para congelar.', 'error')
+        return
+    end
+
+    local ped = PlayerPedId()
+    RequestAnim("gx_s04@animation")
+    if HasAnimDictLoaded("gx_s04@animation") then
+        TaskPlayAnim(ped, "gx_s04@animation", "gx_s04_clip", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("water", 0.8)
+    TriggerServerEvent('lumina_poderes:server:executeFreeze', targetId)
+    Notify('Criomancia', 'Você disparou uma rajada gélida contra o alvo!', 'success')
+    Wait(3000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveFreeze', function(duration)
+    local ped = PlayerPedId()
+    duration = duration or 8000
+    PlaySpellSound("water", 0.9)
+
+    SetTimecycleModifier("rply_vignette")
+    FreezeEntityPosition(ped, true)
+
+    local coords = GetEntityCoords(ped)
+    UseParticleFxAssetNextCall("core")
+    StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.5, false, false, false)
+
+    Notify('Criomancia', 'Você foi CONGELADO por magia de gelo!', 'error')
+
+    Wait(duration)
+    ClearTimecycleModifier()
+    FreezeEntityPosition(ped, false)
+    PlaySpellSound("dirt", 0.5)
+    Notify('Criomancia', 'O gelo se quebrou e você voltou a se mover.', 'inform')
+end)
+
+-- =========================================================================
+-- 28. PUXÃO SOMBRIO / CORRENTES ARCANAS (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('puxar', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.PuxaoSombrio.Distancia or 25.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Puxão Sombrio', 'Nenhum alvo ao alcance para puxar.', 'error')
+        return
+    end
+
+    local ped = PlayerPedId()
+    local dest = GetEntityCoords(ped) + (GetEntityForwardVector(ped) * 1.8)
+
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 2000, 49, 0, false, false, false)
+    PlaySpellSound("demon", 0.8)
+
+    TriggerServerEvent('lumina_poderes:server:executeShadowPull', targetId, dest.x, dest.y, dest.z)
+    Notify('Puxão Sombrio', 'Você arrastou a vítima até você com correntes sombrias!', 'success')
+    Wait(2000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveShadowPull', function(destX, destY, destZ)
+    local ped = PlayerPedId()
+    PlaySpellSound("demon", 0.8)
+    SetPedToRagdoll(ped, 3000, 3000, 0, 0, 0, 0)
+
+    local myCoords = GetEntityCoords(ped)
+    local pullDir = vector3(destX, destY, destZ) - myCoords
+
+    ApplyForceToEntity(ped, 1, pullDir.x * 2.0, pullDir.y * 2.0, pullDir.z * 2.0 + 3.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+    Notify('Puxão Sombrio', 'Correntes sombrias te puxaram pelo ar!', 'error')
+end)
+
+-- =========================================================================
+-- 29. PARADA TEMPORAL (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('parartempo', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    PlaySpellSound("earthquake", 0.9)
+    AnimpostfxPlay("DeadlineNeon", 3000, false)
+    TriggerServerEvent('lumina_poderes:server:syncTimeStop', coords)
+    Notify('Parada Temporal', 'O TEMPO PAROU! O mundo congelou ao seu redor por 6s!', 'success')
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveTimeStop', function(casterSrc, coords, duration)
+    local ped = PlayerPedId()
+    local myCoords = GetEntityCoords(ped)
+    local dist = #(coords - myCoords)
+
+    if dist <= (Config.ParadaTemporal.Raio or 30.0) then
+        if GetPlayerServerId(PlayerId()) ~= tonumber(casterSrc) then
+            FreezeEntityPosition(ped, true)
+            SetTimecycleModifier("rply_vignette")
+            PlaySpellSound("water", 0.6)
+            Notify('Parada Temporal', 'O tempo foi congelado por uma entidade arcana!', 'warning')
+
+            Wait(duration or 6000)
+            ClearTimecycleModifier()
+            FreezeEntityPosition(ped, false)
+            Notify('Parada Temporal', 'O fluxo do tempo retornou ao normal.', 'inform')
+        end
+    end
+end)
+

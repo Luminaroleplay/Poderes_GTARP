@@ -248,3 +248,53 @@ RegisterNetEvent('lumina_poderes:server:executeCrucifixion', function(targetId)
 
     TriggerClientEvent('lumina_poderes:client:receiveCrucifixion', targetId, Config.Crucificacao.DuracaoMs or 8000)
 end)
+
+-- =========================================================================
+-- PODERES ORIGINAIS & CRIATIVOS (LOMAR DEV) - SINCRONIZAÇÃO EM REDE
+-- =========================================================================
+
+-- 1. Telecinese (Lançamento / Arremesso)
+RegisterNetEvent('lumina_poderes:server:syncTelekinesisThrow', function(targetId, forceX, forceY, forceZ)
+    local target = tonumber(targetId)
+    if target and target > 0 and GetPlayerPing(target) > 0 then
+        TriggerClientEvent('lumina_poderes:client:receiveTelekinesisThrow', target, forceX, forceY, forceZ)
+    end
+end)
+
+-- 2. Escudo Místico
+RegisterNetEvent('lumina_poderes:server:syncShield', function(coords)
+    TriggerClientEvent('lumina_poderes:client:receiveShieldEffect', -1, coords)
+end)
+
+-- 3. Buraco Negro / Vórtice Gravitacional
+RegisterNetEvent('lumina_poderes:server:syncBlackHole', function(coords)
+    TriggerClientEvent('lumina_poderes:client:receiveBlackHole', -1, coords)
+end)
+
+-- 4. Criomancia (Congelamento)
+RegisterNetEvent('lumina_poderes:server:executeFreeze', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para congelar.', 'error')
+        return
+    end
+    TriggerClientEvent('lumina_poderes:client:receiveFreeze', targetId, Config.Criomancia.DuracaoMs or 8000)
+end)
+
+-- 5. Puxão Sombrio
+RegisterNetEvent('lumina_poderes:server:executeShadowPull', function(targetId, destX, destY, destZ)
+    local src = source
+    targetId = tonumber(targetId)
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para o puxão sombrio.', 'error')
+        return
+    end
+    TriggerClientEvent('lumina_poderes:client:receiveShadowPull', targetId, destX, destY, destZ)
+end)
+
+-- 6. Parada Temporal
+RegisterNetEvent('lumina_poderes:server:syncTimeStop', function(coords)
+    local src = source
+    TriggerClientEvent('lumina_poderes:client:receiveTimeStop', -1, src, coords, Config.ParadaTemporal.DuracaoMs or 6000)
+end)
