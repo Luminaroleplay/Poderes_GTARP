@@ -132,3 +132,119 @@ RegisterCommand("fire", function(source, args)
         end
     end
 end, false)
+
+-- =========================================================================
+-- NOVOS PODERES SOBRENATURAIS (LOMAR DEV) - SINCRONIZAÇÃO EM REDE
+-- =========================================================================
+
+-- 1. Ressurreição Celestial / Renascer
+RegisterNetEvent('lumina_poderes:server:executeRevive', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) then
+        NotifyServer(src, 'Alvo inválido para ressuscitar.', 'error')
+        return
+    end
+
+    -- Animações e efeitos para ambos
+    TriggerClientEvent('lumina_poderes:client:playReviveCaster', src)
+    TriggerClientEvent('lumina_poderes:client:playReviveVictim', targetId)
+
+    -- Se qbx_medical ou qb-ambulancejob existir, reviver formalmente
+    if GetResourceState('qbx_medical') == 'started' then
+        exports.qbx_medical:Revive(targetId)
+    elseif GetResourceState('qb-ambulancejob') == 'started' then
+        TriggerClientEvent('hospital:client:Revive', targetId)
+    end
+end)
+
+-- 2. Beijo da Morte Vampírico
+RegisterNetEvent('lumina_poderes:server:executeDeathKiss', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para o Beijo da Morte.', 'error')
+        return
+    end
+
+    TriggerClientEvent('lumina_poderes:client:playDeathKissCaster', src)
+    TriggerClientEvent('lumina_poderes:client:playDeathKissVictim', targetId)
+end)
+
+-- 3. Canto da Sereia / Hipnose
+RegisterNetEvent('lumina_poderes:server:executeHypnosis', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if targetId and targetId > 0 and GetPlayerPing(targetId) then
+        TriggerClientEvent('lumina_poderes:client:receiveHypnosis', targetId)
+    end
+end)
+
+RegisterNetEvent('lumina_poderes:server:executeHypnosisArea', function(coords)
+    TriggerClientEvent('lumina_poderes:client:receiveHypnosisArea', -1, coords)
+end)
+
+-- 4. Petrificação
+RegisterNetEvent('lumina_poderes:server:executePetrify', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para petrificar.', 'error')
+        return
+    end
+
+    TriggerClientEvent('lumina_poderes:client:receivePetrify', targetId, Config.Petrificacao.DuracaoMs or 10000)
+end)
+
+-- 5. Ataque Psíquico
+RegisterNetEvent('lumina_poderes:server:executeMentalAttack', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para ataque psíquico.', 'error')
+        return
+    end
+
+    TriggerClientEvent('lumina_poderes:client:receiveMentalAttack', targetId, Config.AtaqueMental.Dano or 30)
+end)
+
+-- 6. Julgamento da Luz Divina
+RegisterNetEvent('lumina_poderes:server:executeDivineLight', function(coords)
+    TriggerClientEvent('lumina_poderes:client:receiveDivineLight', -1, coords)
+end)
+
+-- 7. Prisão de Água
+RegisterNetEvent('lumina_poderes:server:executeWaterPrison', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para a prisão de água.', 'error')
+        return
+    end
+
+    TriggerClientEvent('lumina_poderes:client:receiveWaterPrison', targetId, Config.PrisaoAgua.DuracaoMs or 8000)
+end)
+
+-- 8. Tornado / Vórtice
+RegisterNetEvent('lumina_poderes:server:executeTornado', function(coords)
+    TriggerClientEvent('lumina_poderes:client:receiveTornado', -1, coords)
+end)
+
+-- 9. Crucificação Mística
+RegisterNetEvent('lumina_poderes:server:executeCrucifixion', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para crucificação.', 'error')
+        return
+    end
+
+    TriggerClientEvent('lumina_poderes:client:receiveCrucifixion', targetId, Config.Crucificacao.DuracaoMs or 8000)
+end)

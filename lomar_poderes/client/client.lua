@@ -679,12 +679,80 @@ local function TransformarLobisomem()
     end)
 end
 
+local isLoboSirius = false
+
+local function TransformarLoboSirius()
+    local ped = PlayerPedId()
+    local pedId = PlayerId()
+
+    if isLobisomem or isLoboSirius then
+        Notify('Lobo Sirius', 'Você já está transformado! Use /humano para reverter primeiro.', 'error')
+        return
+    end
+
+    if GetResourceState('illenium-appearance') == 'started' and exports['illenium-appearance'] then
+        pcall(function()
+            savedHumanAppearance = exports['illenium-appearance']:getPedAppearance(ped)
+        end)
+    end
+    savedHumanModel = GetEntityModel(ped)
+
+    local coords = GetEntityCoords(ped)
+    PlaySpellSound(Config.LoboSirius.AudioTransformation or "demon", 0.8)
+
+    RequestNamedPtfxAsset("core")
+    while not HasNamedPtfxAssetLoaded("core") do Wait(10) end
+    UseParticleFxAssetNextCall("core")
+    StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.5, false, false, false)
+
+    ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.4)
+    Wait(1000)
+
+    local siriusModel = Config.LoboSirius.Model or "LoboSirius"
+    local modelHash = GetHashKey(siriusModel)
+
+    RequestModel(modelHash)
+    local timeout = 0
+    while not HasModelLoaded(modelHash) and timeout < 200 do
+        Wait(20)
+        timeout = timeout + 1
+    end
+
+    if not HasModelLoaded(modelHash) then
+        Notify('Lobo Sirius', 'Erro ao carregar modelo ' .. siriusModel, 'error')
+        return
+    end
+
+    SetPlayerModel(pedId, modelHash)
+    SetModelAsNoLongerNeeded(modelHash)
+
+    local newPed = PlayerPedId()
+    SetPedDefaultComponentVariation(newPed)
+
+    local maxHp = Config.LoboSirius.MaxHealth or 300
+    SetPedMaxHealth(newPed, maxHp)
+    SetEntityHealth(newPed, maxHp)
+    SetRunSprintMultiplierForPlayer(pedId, Config.LoboSirius.SpeedMultiplier or 1.60)
+
+    isLoboSirius = true
+    Notify('Lobo Sirius', 'Você se transformou no ágil Lobo Sirius! Comandos: /uivo, /visaolobo, /humano', 'success')
+
+    CreateThread(function()
+        while isLoboSirius do
+            local pId = PlayerId()
+            SetRunSprintMultiplierForPlayer(pId, Config.LoboSirius.SpeedMultiplier or 1.60)
+            ResetPlayerStamina(pId)
+            Wait(0)
+        end
+    end)
+end
+
 local function DestransformarLobisomem()
     local ped = PlayerPedId()
     local pedId = PlayerId()
 
-    if not isLobisomem then
-        Notify('Lobisomem', 'Você não está na forma de Lobisomem.', 'error')
+    if not isLobisomem and not isLoboSirius then
+        Notify('Transformação', 'Você não está em nenhuma forma de fera.', 'error')
         return
     end
 
@@ -745,41 +813,41 @@ local function DestransformarLobisomem()
     end
 
     isLobisomem = false
+    isLoboSirius = false
     savedHumanAppearance = nil
     savedHumanModel = nil
 
-    Notify('Lobisomem', 'Você retornou à sua forma humana.', 'inform')
+    Notify('Transformação', 'Você retornou à sua forma humana.', 'inform')
 end
 
 local function UivarLobisomem()
     local ped = PlayerPedId()
 
-    if not isLobisomem then
-        Notify('Lobisomem', 'Você precisa estar transformado em Lobisomem para uivar!', 'error')
+    if not isLobisomem and not isLoboSirius then
+        Notify('Lobisomem', 'Você precisa estar na forma de Lobo para uivar!', 'error')
         return
     end
 
     local coords = GetEntityCoords(ped)
     PlaySpellSound(Config.Lobisomem.AudioHowl or "demon", 0.9)
 
-    -- Animação de uivo para o céu
-    RequestAnim("rcmnigel1a")
-    TaskPlayAnim(ped, "rcmnigel1a", "laugh_im_amused", 8.0, -8.0, 3500, 49, 0, false, false, false)
+    if isLobisomem then
+        RequestAnim("rcmnigel1a")
+        TaskPlayAnim(ped, "rcmnigel1a", "laugh_im_amused", 8.0, -8.0, 3500, 49, 0, false, false, false)
+    end
 
-    -- Treme a tela
     ShakeGameplayCam('VIBRATE_SHAKE', 1.0)
     SetTimeout(2000, function()
         ShakeGameplayCam('VIBRATE_SHAKE', 0.0)
     end)
 
-    -- Sincroniza som e tremor para jogadores próximos
     TriggerServerEvent("lumina_poderes:server:syncHowl", coords)
     Notify('Uivo', 'Você uivou furiosamente para a lua!', 'success')
 end
 
 local function ToggleVisaoLobo()
-    if not isLobisomem then
-        Notify('Lobisomem', 'Apenas lobisomens possuem visão feral apurada!', 'error')
+    if not isLobisomem and not isLoboSirius then
+        Notify('Instinto Feral', 'Apenas feras possuem visão noturna apurada!', 'error')
         return
     end
 
@@ -794,7 +862,7 @@ local function ToggleVisaoLobo()
     end
 end
 
--- Comandos registrados (LOMAR DEV)
+-- Comandos do Lobisomem e Lobo Sirius
 RegisterCommand('lobisomem', function()
     TransformarLobisomem()
 end, false)
@@ -805,6 +873,14 @@ end, false)
 
 RegisterCommand('transformar', function()
     TransformarLobisomem()
+end, false)
+
+RegisterCommand('lobinho', function()
+    TransformarLoboSirius()
+end, false)
+
+RegisterCommand('lobosirius', function()
+    TransformarLoboSirius()
 end, false)
 
 RegisterCommand('humano', function()
@@ -837,5 +913,495 @@ RegisterNetEvent('lumina_poderes:client:receiveHowl', function(coords)
         Wait(1500)
         ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.0)
     end
+end)
+
+-- =========================================================================
+-- 13. RESSURREIÇÃO CELESTIAL / RENASCER (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('renascer', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.Renascer.Distancia or 5.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Renascer', 'Nenhum jogador próximo encontrado para ressuscitar.', 'error')
+        return
+    end
+
+    TriggerServerEvent('lumina_poderes:server:executeRevive', targetId)
+end, false)
+
+RegisterCommand('reviver', function(source, args)
+    ExecuteCommand('renascer ' .. (args[1] or ''))
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:playReviveCaster', function()
+    local ped = PlayerPedId()
+    RequestAnim("rcmepsilonism8")
+    TaskPlayAnim(ped, "rcmepsilonism8", "worship_base", 8.0, -8.0, 7000, 1, 0, false, false, false)
+    PlaySpellSound("angel", 0.8)
+    Notify('Renascer', 'Você canalizou a luz celestial para reanimar a alma.', 'success')
+    Wait(7000)
+    ClearPedTasks(ped)
+end)
+
+RegisterNetEvent('lumina_poderes:client:playReviveVictim', function()
+    local ped = PlayerPedId()
+    PlaySpellSound("angel", 0.9)
+
+    -- Animação de anjo levitando
+    RequestAnim("gx_s01@animation")
+    if HasAnimDictLoaded("gx_s01@animation") then
+        TaskPlayAnim(ped, "gx_s01@animation", "gx_s01_clip", 8.0, -8.0, 7000, 1, 0, false, false, false)
+    end
+
+    -- Partícula de brilho celestial
+    local coords = GetEntityCoords(ped)
+    RequestNamedPtfxAsset("core")
+    if HasNamedPtfxAssetLoaded("core") then
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.5, false, false, false)
+    end
+
+    Wait(7000)
+    ClearPedTasksImmediately(ped)
+    SetEntityHealth(ped, Config.Renascer.VidaCurada or 200)
+    ClearPedBloodDamage(ped)
+    Notify('Ressurreição', 'Você foi banhado pela luz celestial e ressuscitou!', 'success')
+end)
+
+-- =========================================================================
+-- 14. BEIJO DA MORTE VAMPÍRICO (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('beijodamorte', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.BeijoDaMorte.Distancia or 3.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Beijo da Morte', 'Nenhuma vítima próxima ao alcance.', 'error')
+        return
+    end
+
+    TriggerServerEvent('lumina_poderes:server:executeDeathKiss', targetId)
+end, false)
+
+RegisterCommand('sugaralma', function(source, args)
+    ExecuteCommand('beijodamorte ' .. (args[1] or ''))
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:playDeathKissCaster', function()
+    local ped = PlayerPedId()
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_teleport_aln", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    PlaySpellSound("demon", 0.8)
+
+    local curHp = GetEntityHealth(ped)
+    local maxHp = GetEntityMaxHealth(ped)
+    SetEntityHealth(ped, math.min(maxHp, curHp + (Config.BeijoDaMorte.Cura or 100)))
+    SetPedArmour(ped, 100)
+
+    Notify('Beijo da Morte', 'Você drenou a essência vital da vítima!', 'success')
+    Wait(4000)
+    ClearPedTasks(ped)
+end)
+
+RegisterNetEvent('lumina_poderes:client:playDeathKissVictim', function()
+    local ped = PlayerPedId()
+    PlaySpellSound("demon", 0.7)
+    ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.8)
+
+    -- Partículas de sangue
+    local coords = GetEntityCoords(ped)
+    RequestNamedPtfxAsset("core")
+    if HasNamedPtfxAssetLoaded("core") then
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("blood_stab", coords.x, coords.y, coords.z + 0.5, 0.0, 0.0, 0.0, 2.0, false, false, false)
+    end
+
+    ApplyDamageToPed(ped, Config.BeijoDaMorte.Dano or 50, false)
+    RequestAnim("missfbi5ig_0")
+    TaskPlayAnim(ped, "missfbi5ig_0", "lyinginpain_loop_steve", 8.0, -8.0, 5000, 1, 0, false, false, false)
+
+    Notify('Beijo da Morte', 'Sua alma está sendo devorada pelo vampiro!', 'error')
+    Wait(5000)
+    ClearPedTasks(ped)
+end)
+
+-- =========================================================================
+-- 15. CANTO DA SEREIA / HIPNOSE (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('canto_sereia', function(source, args)
+    local ped = PlayerPedId()
+    local targetId = tonumber(args[1])
+
+    RequestAnim("sereia10@animation")
+    if HasAnimDictLoaded("sereia10@animation") then
+        TaskPlayAnim(ped, "sereia10@animation", "sereia10_clip", 8.0, -8.0, 6000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmepsilonism8")
+        TaskPlayAnim(ped, "rcmepsilonism8", "worship_base", 8.0, -8.0, 6000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("water", 0.8)
+
+    if targetId then
+        TriggerServerEvent('lumina_poderes:server:executeHypnosis', targetId)
+    else
+        local coords = GetEntityCoords(ped)
+        TriggerServerEvent('lumina_poderes:server:executeHypnosisArea', coords)
+    end
+
+    Notify('Sereia', 'Você entoou o canto hipnótico das sereias!', 'success')
+    Wait(6000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('hipnose', function(source, args)
+    ExecuteCommand('canto_sereia ' .. (args[1] or ''))
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveHypnosisArea', function(coords)
+    local myCoords = GetEntityCoords(PlayerPedId())
+    local dist = #(coords - myCoords)
+    if dist > 0.5 and dist <= (Config.HipnoseSereia.Raio or 12.0) then
+        TriggerEvent('lumina_poderes:client:receiveHypnosis')
+    end
+end)
+
+RegisterNetEvent('lumina_poderes:client:receiveHypnosis', function()
+    local ped = PlayerPedId()
+    PlaySpellSound("water", 0.7)
+    ShakeGameplayCam('DRUNK_SHAKE', 1.8)
+    SetPedIsDrunk(ped, true)
+
+    RequestAnim("misscarsteal4@actor")
+    TaskPlayAnim(ped, "misscarsteal4@actor", "stumble", 8.0, -8.0, 10000, 1, 0, false, false, false)
+    Notify('Hipnose', 'Você ouviu o canto sedutor e perdeu o controle dos seus sentidos!', 'error')
+
+    Wait(10000)
+    ClearPedTasksImmediately(ped)
+    SetPedIsDrunk(ped, false)
+    ShakeGameplayCam('DRUNK_SHAKE', 0.0)
+end)
+
+-- =========================================================================
+-- 16. PETRIFICAÇÃO / PRISÃO DE PEDRA (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('petrificar', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.Petrificacao.Distancia or 10.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Petrificação', 'Nenhum alvo próximo para petrificar.', 'error')
+        return
+    end
+
+    local ped = PlayerPedId()
+    RequestAnim("gx_s05@animation")
+    if HasAnimDictLoaded("gx_s05@animation") then
+        TaskPlayAnim(ped, "gx_s05@animation", "gx_s05_clip", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("dirt", 0.8)
+    TriggerServerEvent('lumina_poderes:server:executePetrify', targetId)
+    Notify('Petrificação', 'Você canalizou as forças da terra contra o alvo!', 'success')
+    Wait(3000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receivePetrify', function(duration)
+    local ped = PlayerPedId()
+    duration = duration or 10000
+    PlaySpellSound("dirt", 0.9)
+
+    -- Poeira da petrificação
+    local coords = GetEntityCoords(ped)
+    RequestNamedPtfxAsset("core")
+    if HasNamedPtfxAssetLoaded("core") then
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_grenade_dirt", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.8, false, false, false)
+    end
+
+    FreezeEntityPosition(ped, true)
+    RequestAnim("amb@world_human_statue@base")
+    TaskPlayAnim(ped, "amb@world_human_statue@base", "base", 8.0, -8.0, duration, 1, 0, false, false, false)
+
+    Notify('Petrificação', 'Seu corpo virou pedra sólida! Você está petrificado!', 'error')
+
+    Wait(duration)
+    PlaySpellSound("dirt", 0.6)
+    ClearPedTasksImmediately(ped)
+    FreezeEntityPosition(ped, false)
+    Notify('Petrificação', 'A rocha se despedaçou e você voltou a se mover.', 'inform')
+end)
+
+-- =========================================================================
+-- 17. ATAQUE PSÍQUICO / RAJADA MENTAL (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('ataquemental', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.AtaqueMental.Distancia or 15.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Ataque Psíquico', 'Nenhum alvo mental ao alcance.', 'error')
+        return
+    end
+
+    local ped = PlayerPedId()
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
+    PlaySpellSound("mental", 0.8)
+
+    TriggerServerEvent('lumina_poderes:server:executeMentalAttack', targetId)
+    Notify('Ataque Psíquico', 'Você disparou uma rajada mental devastadora!', 'success')
+    Wait(3000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('psiquico', function(source, args)
+    ExecuteCommand('ataquemental ' .. (args[1] or ''))
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveMentalAttack', function(damage)
+    local ped = PlayerPedId()
+    PlaySpellSound("mental", 0.8)
+    ShakeGameplayCam('JOLT_SHAKE', 1.5)
+
+    -- Partículas elétricas / mentais
+    local coords = GetEntityCoords(ped)
+    RequestNamedPtfxAsset("core")
+    if HasNamedPtfxAssetLoaded("core") then
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("ent_ray_prologue_elec_crackle", coords.x, coords.y, coords.z + 0.6, 0.0, 0.0, 0.0, 1.5, false, false, false)
+    end
+
+    ApplyDamageToPed(ped, damage or 30, false)
+    RequestAnim("mp_am_hold_up")
+    TaskPlayAnim(ped, "mp_am_hold_up", "cower_intro", 8.0, -8.0, 5000, 49, 0, false, false, false)
+    Notify('Ataque Psíquico', 'Sua mente está sendo torturada por um ataque psíquico!', 'error')
+
+    Wait(5000)
+    ClearPedTasks(ped)
+end)
+
+-- =========================================================================
+-- 18. JULGAMENTO DA LUZ DIVINA (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('luzdivina', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    RequestAnim("sereia10@animation")
+    if HasAnimDictLoaded("sereia10@animation") then
+        TaskPlayAnim(ped, "sereia10@animation", "sereia10_clip", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmepsilonism8")
+        TaskPlayAnim(ped, "rcmepsilonism8", "worship_base", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("lux", 0.9)
+    TriggerServerEvent('lumina_poderes:server:executeDivineLight', coords)
+    Notify('Luz Divina', 'Você invocou o resplendor sagrado da Luz Divina!', 'success')
+    Wait(4000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('purificar', function()
+    ExecuteCommand('luzdivina')
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveDivineLight', function(coords)
+    local myCoords = GetEntityCoords(PlayerPedId())
+    local dist = #(coords - myCoords)
+
+    if dist <= (Config.LuzDivina.Raio or 15.0) then
+        PlaySpellSound("lux", 0.8)
+        AnimpostfxPlay("DeadlineNeon", 3000, false)
+        ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.8)
+        Notify('Luz Divina', 'Você foi cegado pelo clarão celestial!', 'warning')
+    end
+end)
+
+-- =========================================================================
+-- 19. PRISÃO DE ÁGUA / AFOGAMENTO NO SECO (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('prisao_agua', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.PrisaoAgua.Distancia or 10.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Prisão de Água', 'Nenhum alvo próximo para prender na água.', 'error')
+        return
+    end
+
+    local ped = PlayerPedId()
+    RequestAnim("gx_s04@animation")
+    if HasAnimDictLoaded("gx_s04@animation") then
+        TaskPlayAnim(ped, "gx_s04@animation", "gx_s04_clip", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("water", 0.8)
+    TriggerServerEvent('lumina_poderes:server:executeWaterPrison', targetId)
+    Notify('Prisão de Água', 'Você envolveu o alvo numa esfera de água!', 'success')
+    Wait(4000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('afogar', function(source, args)
+    ExecuteCommand('prisao_agua ' .. (args[1] or ''))
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveWaterPrison', function(duration)
+    local ped = PlayerPedId()
+    duration = duration or 8000
+    PlaySpellSound("water", 0.8)
+
+    RequestAnim("rcmnigel1b")
+    TaskPlayAnim(ped, "rcmnigel1b", "swimming_idle", 8.0, -8.0, duration, 1, 0, false, false, false)
+    Notify('Prisão de Água', 'Você foi preso numa bolha mágica de água e está se afogando!', 'error')
+
+    local startTime = GetGameTimer()
+    while (GetGameTimer() - startTime) < duration do
+        ApplyDamageToPed(ped, 5, false)
+        Wait(2000)
+    end
+
+    ClearPedTasksImmediately(ped)
+    Notify('Prisão de Água', 'A bolha d\'água se dissipou.', 'inform')
+end)
+
+-- =========================================================================
+-- 20. VÓRTICE DE TEMPESTADE / TORNADO (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('tornado', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    RequestAnim("gx_s02@animation")
+    if HasAnimDictLoaded("gx_s02@animation") then
+        TaskPlayAnim(ped, "gx_s02@animation", "gx_s02_clip", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("tornado", 0.9)
+    TriggerServerEvent('lumina_poderes:server:executeTornado', coords)
+    Notify('Tornado', 'Você invocou um furacão furioso!', 'success')
+    Wait(4000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('vendaval', function()
+    ExecuteCommand('tornado')
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveTornado', function(coords)
+    local ped = PlayerPedId()
+    local myCoords = GetEntityCoords(ped)
+    local dist = #(coords - myCoords)
+
+    if dist <= 40.0 then
+        PlaySpellSound("tornado", 0.8)
+        ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.0)
+    end
+
+    -- Partícula de tornado
+    RequestNamedPtfxAsset("core")
+    if HasNamedPtfxAssetLoaded("core") then
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 3.5, false, false, false)
+    end
+
+    -- Empurra e derruba quem estiver no raio do tornado
+    if dist > 1.0 and dist <= (Config.Tornado.Raio or 12.0) then
+        SetPedToRagdoll(ped, 4000, 4000, 0, 0, 0, 0)
+        Notify('Tornado', 'A força do vendaval te arremessou ao chão!', 'error')
+    end
+end)
+
+-- =========================================================================
+-- 21. CRUCIFICAÇÃO MÍSTICA (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('crucificar', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local closestP, dist = GetClosestPlayer()
+        if closestP ~= -1 and dist <= (Config.Crucificacao.Distancia or 8.0) then
+            targetId = GetPlayerServerId(closestP)
+        end
+    end
+
+    if not targetId then
+        Notify('Crucificação', 'Nenhum alvo ao alcance para crucificar.', 'error')
+        return
+    end
+
+    local ped = PlayerPedId()
+    RequestAnim("gx_s07@animation")
+    if HasAnimDictLoaded("gx_s07@animation") then
+        TaskPlayAnim(ped, "gx_s07@animation", "gx_s07_clip", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    else
+        RequestAnim("rcmbarry")
+        TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 4000, 49, 0, false, false, false)
+    end
+
+    PlaySpellSound("demon", 0.8)
+    TriggerServerEvent('lumina_poderes:server:executeCrucifixion', targetId)
+    Notify('Crucificação', 'Você suspendeu a vítima na cruz invisível!', 'success')
+    Wait(4000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveCrucifixion', function(duration)
+    local ped = PlayerPedId()
+    duration = duration or 8000
+    PlaySpellSound("demon", 0.9)
+
+    local coords = GetEntityCoords(ped)
+    FreezeEntityPosition(ped, true)
+    SetEntityCoords(ped, coords.x, coords.y, coords.z + (Config.Crucificacao.Altura or 1.6), false, false, false, false)
+
+    RequestAnim("anim@heists@heist_corona@single_team")
+    if HasAnimDictLoaded("anim@heists@heist_corona@single_team") then
+        TaskPlayAnim(ped, "anim@heists@heist_corona@single_team", "single_team_loop_boss", 8.0, -8.0, duration, 1, 0, false, false, false)
+    end
+
+    Notify('Crucificação', 'Forças arcanas te ergueram no ar numa crucificação mágica!', 'error')
+
+    Wait(duration)
+    ClearPedTasksImmediately(ped)
+    FreezeEntityPosition(ped, false)
+    Notify('Crucificação', 'A cruz invisível se desfez.', 'inform')
 end)
 

@@ -56,3 +56,63 @@ Config.Lobisomem = {
     PtfxAsset = 'core',                  -- Partícula de fumaça mística
     PtfxParticle = 'exp_grd_grenade_smoke'
 }
+
+-- Lobo Ágil / Sirius (LOMAR DEV)
+Config.LoboSirius = {
+    Model = 'LoboSirius',                -- Modelo animal de 4 patas (Lobo_Sirius_Lumina)
+    MaxHealth = 300,
+    SpeedMultiplier = 1.60,              -- Agilidade extrema
+    AudioTransformation = 'demon'
+}
+
+-- Novos Poderes Sobrenaturais (LOMAR DEV)
+Config.Renascer = {
+    Distancia = 5.0,
+    VidaCurada = 200,
+    TempoLevitacao = 8000
+}
+
+Config.BeijoDaMorte = {
+    Distancia = 3.0,
+    Dano = 50,
+    Cura = 100
+}
+
+Config.HipnoseSereia = {
+    Raio = 12.0,
+    DuracaoMs = 12000
+}
+
+Config.Petrificacao = {
+    Distancia = 10.0,
+    DuracaoMs = 10000
+}
+
+Config.AtaqueMental = {
+    Distancia = 15.0,
+    Dano = 30,
+    DuracaoMs = 6000
+}
+
+Config.LuzDivina = {
+    Raio = 15.0,
+    DuracaoMs = 5000
+}
+
+Config.PrisaoAgua = {
+    Distancia = 10.0,
+    DuracaoMs = 8000,
+    Dano = 25
+}
+
+Config.Tornado = {
+    Raio = 12.0,
+    DuracaoMs = 8000,
+    ForcaEmpurrao = 4.0
+}
+
+Config.Crucificacao = {
+    Distancia = 8.0,
+    DuracaoMs = 8000,
+    Altura = 1.6
+}
