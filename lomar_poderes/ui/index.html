@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Lumina Poderes</title>
+    <script type="text/javascript">
+        window.addEventListener("message", function(event) {
+            var item = event.data;
+            if (item && item.sound) {
+                var soundFile = item.sound;
+                // Se já não tiver extensão, define .ogg como padrão
+                if (!soundFile.endsWith('.ogg') && !soundFile.endsWith('.mp3')) {
+                    soundFile += '.ogg';
+                }
+                var audio = new Audio('sounds/' + soundFile);
+                audio.volume = item.volume !== undefined ? item.volume : 0.5;
+                audio.play().catch(function(e) {
+                    // Erros silenciosos de autoplay
+                });
+            }
+        });
+    </script>
+</head>
+<body style="display: none; background: transparent;">
+</body>
+</html>

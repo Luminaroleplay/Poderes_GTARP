@@ -1,0 +1,65 @@
+================================================================================
+   PACOTE DE PODERES SOBRENATURAIS & LOBISOMEM (LUPINO LUMINA) v3.0
+   Desenvolvido por: LOMAR DEV
+   Comunidade: MRI Community
+================================================================================
+
+Este pacote contem:
+1. lomar_poderes   -> Script com os poderes sobrenaturais, transformacoes, audio NUI e particulas sincronizadas (LOMAR DEV)
+2. Lupino_Lumina   -> Skin/Ped 3D customizada do Werewolf (Lobisomem) com stream e peds.meta (LOMAR DEV)
+
+--------------------------------------------------------------------------------
+COMO INSTALAR NA BASE MRI:
+--------------------------------------------------------------------------------
+1. Copie as pastas 'lomar_poderes' e 'Lupino_Lumina' para a pasta 'resources' do
+   seu servidor (por exemplo em: resources/[mri]/ ou resources/[LUMINA]/).
+
+2. No seu arquivo 'server.cfg', certifique-se de que a pasta onde colocou esta
+   sendo iniciada, ou adicione:
+      ensure Lupino_Lumina
+      ensure lomar_poderes
+
+3. Inicie ou reinicie o servidor. Ao iniciar, voce vera a confirmacao de
+   carregamento assinada por LOMAR DEV no console!
+
+--------------------------------------------------------------------------------
+LISTA COMPLETA DE PODERES E COMANDOS:
+--------------------------------------------------------------------------------
+TRANSFORMAÇÃO EM LOBISOMEM (LUPINO LUMINA):
+1.  /lobisomem ou /lobao         -> Transforma seu personagem no Werewolf gigante com
+                                    efeito de fumaça mística, urro, 400 HP, 100 Colete,
+                                    super corrida, super pulo e dano massivo nas garras!
+                                    (Salva sua skin humana para restaurar 100% depois)
+2.  /humano ou /destransformar   -> Destransforma e retorna à sua skin/roupa humana original
+                                    (integrado com illenium-appearance e vms_charcreator)
+3.  /uivo ou /uivar              -> Solta um uivo ensurdecedor para a lua, tremendo a tela
+                                    e reproduzindo o rugido da fera para todos ao redor
+4.  /visaolobo                   -> Ativa ou desativa a visão noturna feral do lobo
+
+PODERES ELEMENTAIS & MÍSTICOS:
+5.  /respiracao ou /sereia       -> Nado veloz, fôlego infinito e proteção na água
+6.  /tpmagico ou /tpcast         -> Teleporte com mira no chão, raio e trovão
+7.  /levitar ou /levitate        -> Flutua e medita no ar (aperte E para descer)
+8.  /magia_fogo ou /flametest    -> Lança-chamas mágico pelas mãos (aperte E para usar)
+9.  /fumaca ou /desaparecer      -> Explosão de névoa mística e trevas
+10. /morder ou /alimentar        -> Mordida sincronizada de vampiro que drena vida da vítima
+11. /olhos_vampiro               -> Visão noturna sombria de predador
+12. /velocidade_vampiro          -> Arrancada veloz com rastro escuro por 12s
+13. /raio ou /tempestade         -> Invoca raio real do céu com mira no chão
+14. /terremoto                   -> Faz a terra tremer com estrondo de terremoto
+15. /risada ou /aterrorizar      -> Risada demoníaca que aterroriza quem estiver perto
+16. /fire [id]                   -> (Admin) Ateia fogo mágico no jogador alvo
+
+--------------------------------------------------------------------------------
+CONFIGURACOES (shared/config.lua):
+--------------------------------------------------------------------------------
+- Abra 'lomar_poderes/shared/config.lua' para configurar:
+  * Modelo, vida e multiplicador de velocidade do Lobisomem
+  * Se os poderes sao livres para todos ou restritos a Admin
+  * Alcance das miras do teleporte e do raio
+  * Quantidade de dano e cura da mordida de vampiro
+  * Duracao e forca do terremoto
+
+================================================================================
+Desenvolvido por: LOMAR DEV | MRI Community
+================================================================================
