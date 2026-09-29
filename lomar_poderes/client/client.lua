@@ -1600,43 +1600,13 @@ RegisterCommand('escudo', function()
 end, false)
 
 -- =========================================================================
--- 24. CLONES DE ILUSÃO / SOMBRAS (LOMAR DEV)
+-- 24. CLONES DE ILUSÃO / GUARDIÕES DE SOMBRA EM CÍRCULO (LOMAR DEV)
 -- =========================================================================
-RegisterCommand('clones', function()
-    local ped = PlayerPedId()
-    local coords = GetEntityCoords(ped)
+local activeCloneGuardians = nil
 
-    PlaySpellSound("demon", 0.8)
-    RequestNamedPtfxAsset("core")
-    while not HasNamedPtfxAssetLoaded("core") do Wait(10) end
-    UseParticleFxAssetNextCall("core")
-    StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 2.0, false, false, false)
-
-    local clonePeds = {}
-    local angles = { 90.0, 270.0 }
-
-    for i = 1, (Config.ClonesSombra.Quantidade or 2) do
-        local clone = ClonePed(ped, false, false, false)
-        if DoesEntityExist(clone) then
-            SetEntityInvincible(clone, true)
-            SetPedCanRagdoll(clone, false)
-            SetBlockingOfNonTemporaryEvents(clone, true)
-
-            local angle = angles[i] or (i * 120.0)
-            local h = GetEntityHeading(ped) + angle
-            SetEntityHeading(clone, h)
-
-            local runTarget = coords + vector3(math.sin(math.rad(-h)) * 40.0, math.cos(math.rad(-h)) * 40.0, 0.0)
-            TaskGoStraightToCoord(clone, runTarget.x, runTarget.y, runTarget.z, 3.0, -1, 0.0, 0.0)
-
-            table.insert(clonePeds, clone)
-        end
-    end
-
-    Notify('Clones', 'Você invocou sombras para despistar seus inimigos!', 'success')
-
-    SetTimeout(Config.ClonesSombra.DuracaoMs or 10000, function()
-        for _, clone in ipairs(clonePeds) do
+local function DispelCloneGuardians()
+    if activeCloneGuardians and #activeCloneGuardians > 0 then
+        for _, clone in ipairs(activeCloneGuardians) do
             if DoesEntityExist(clone) then
                 local cCoords = GetEntityCoords(clone)
                 UseParticleFxAssetNextCall("core")
@@ -1644,6 +1614,166 @@ RegisterCommand('clones', function()
                 DeleteEntity(clone)
             end
         end
+        activeCloneGuardians = nil
+        PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
+        Notify('Clones', 'Seus clones guardiões de sombra se dissiparam.', 'inform')
+    end
+end
+
+RegisterCommand('clones', function()
+    local ped = PlayerPedId()
+
+    -- Se já tiver clones ativos, dissipa-os (modo toggle)
+    if activeCloneGuardians and #activeCloneGuardians > 0 then
+        DispelCloneGuardians()
+        return
+    end
+
+    if IsPedDeadOrDying(ped, true) then
+        Notify('Clones', 'Você não pode invocar clones agora.', 'error')
+        return
+    end
+
+    local pCoords = GetEntityCoords(ped)
+    local pHeading = GetEntityHeading(ped)
+
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
+    RequestNamedPtfxAsset("core")
+    while not HasNamedPtfxAssetLoaded("core") do Wait(10) end
+
+    RequestAnim("move_m@intimidation@cop@unarmed")
+    RequestAnim("melee@unarmed@streamed_core")
+
+    UseParticleFxAssetNextCall("core")
+    StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", pCoords.x, pCoords.y, pCoords.z, 0.0, 0.0, 0.0, 2.2, false, false, false)
+
+    local count = Config.ClonesSombra.Quantidade or 4
+    local radius = Config.ClonesSombra.RaioCirculo or 2.4
+    local clones = {}
+    local angleStep = 360.0 / count
+
+    for i = 1, count do
+        local angleOffset = (i - 1) * angleStep
+        local rad = math.rad((pHeading + angleOffset) % 360.0)
+        local spawnPos = pCoords + vector3(-math.sin(rad) * radius, math.cos(rad) * radius, 0.0)
+
+        local clone = ClonePed(ped, false, false, false)
+        if DoesEntityExist(clone) then
+            SetEntityCoordsNoOffset(clone, spawnPos.x, spawnPos.y, spawnPos.z, false, false, false)
+            SetEntityHeading(clone, (pHeading + angleOffset + 180.0) % 360.0)
+
+            SetEntityInvincible(clone, true)
+            SetPedCanRagdoll(clone, false)
+            SetBlockingOfNonTemporaryEvents(clone, true)
+            SetPedCombatAttributes(clone, 46, true)
+            SetPedFleeAttributes(clone, 0, false)
+            SetEntityNoCollisionEntity(clone, ped, false)
+
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", spawnPos.x, spawnPos.y, spawnPos.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
+
+            TaskPlayAnim(clone, "move_m@intimidation@cop@unarmed", "idle", 8.0, -8.0, -1, 49, 0.0, false, false, false)
+
+            table.insert(clones, {
+                entity = clone,
+                angleOffset = angleOffset
+            })
+        end
+    end
+
+    -- Previne colisão entre os próprios clones
+    for a = 1, #clones do
+        for b = a + 1, #clones do
+            if DoesEntityExist(clones[a].entity) and DoesEntityExist(clones[b].entity) then
+                SetEntityNoCollisionEntity(clones[a].entity, clones[b].entity, false)
+            end
+        end
+    end
+
+    activeCloneGuardians = {}
+    for _, c in ipairs(clones) do
+        table.insert(activeCloneGuardians, c.entity)
+    end
+
+    Notify('Clones', 'Guardiões de sombra invocados! Eles formaram um círculo protetor de 360° ao seu redor.', 'success')
+
+    -- Thread de escolta e proteção em círculo ativo
+    CreateThread(function()
+        local duration = Config.ClonesSombra.DuracaoMs or 35000
+        local startTime = GetGameTimer()
+
+        while activeCloneGuardians and #activeCloneGuardians > 0 and (GetGameTimer() - startTime) < duration do
+            Wait(100)
+            local currentMaster = PlayerPedId()
+
+            if IsPedDeadOrDying(currentMaster, true) then
+                break
+            end
+
+            local curPos = GetEntityCoords(currentMaster)
+            local curHeading = GetEntityHeading(currentMaster)
+            local isMasterMoving = GetEntitySpeed(currentMaster) > 0.5
+
+            -- 1. Varredura de ameaças próximas para proteção ativa
+            local threatPed = nil
+            local minThreatDist = 5.0
+            for _, p in ipairs(GetGamePool('CPed')) do
+                if DoesEntityExist(p) and p ~= currentMaster and not IsPedDeadOrDying(p, true) then
+                    local isClone = false
+                    for _, c in ipairs(clones) do
+                        if p == c.entity then isClone = true break end
+                    end
+                    if not isClone then
+                        local pDist = #(GetEntityCoords(p) - curPos)
+                        if pDist < minThreatDist and (IsPedInCombat(p, currentMaster) or IsPedArmed(p, 7)) then
+                            threatPed = p
+                            minThreatDist = pDist
+                        end
+                    end
+                end
+            end
+
+            -- 2. Atualiza a posição de cada clone na formação circular
+            for _, cData in ipairs(clones) do
+                local clone = cData.entity
+                if DoesEntityExist(clone) then
+                    local rad = math.rad((curHeading + cData.angleOffset) % 360.0)
+                    local targetSlot = curPos + vector3(-math.sin(rad) * radius, math.cos(rad) * radius, 0.0)
+                    local clonePos = GetEntityCoords(clone)
+                    local distToSlot = #(clonePos - targetSlot)
+                    local distToMaster = #(clonePos - curPos)
+
+                    -- Se o jogador teleportar ou correr muito rápido para longe (> 20m), flash-step de volta ao círculo
+                    if distToMaster > 20.0 then
+                        SetEntityCoordsNoOffset(clone, targetSlot.x, targetSlot.y, targetSlot.z, false, false, false)
+                        SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
+                        UseParticleFxAssetNextCall("core")
+                        StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", targetSlot.x, targetSlot.y, targetSlot.z, 0.0, 0.0, 0.0, 1.0, false, false, false)
+                    elseif threatPed and DoesEntityExist(threatPed) and distToMaster <= 6.0 then
+                        if #(clonePos - GetEntityCoords(threatPed)) < 4.0 then
+                            TaskCombatPed(clone, threatPed, 0, 16)
+                            ApplyDamageToPed(threatPed, 10, false)
+                        end
+                    else
+                        -- Mantém o círculo protetor perfeito em torno do mestre
+                        if isMasterMoving or distToSlot > 1.2 then
+                            if distToSlot > 3.5 then
+                                TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, 3.0, 400, 0.0, 0.0)
+                            else
+                                TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, 1.8, 300, 0.0, 0.0)
+                            end
+                        else
+                            SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
+                            if not IsEntityPlayingAnim(clone, "move_m@intimidation@cop@unarmed", "idle", 3) then
+                                TaskPlayAnim(clone, "move_m@intimidation@cop@unarmed", "idle", 8.0, -8.0, -1, 49, 0.0, false, false, false)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        DispelCloneGuardians()
     end)
 end, false)
 
@@ -2647,3 +2777,1078 @@ RegisterCommand('olhomistico', function()
     end
 end, false)
 
+-- =========================================================================
+-- COMBOS CINEMATOGRÁFICOS DE COMBATE (LOMAR DEV)
+-- =========================================================================
+
+local isCinematicComboActive = false
+local isAimingCombo = false
+local currentCinematicCam = nil
+
+-- Reset imediato, síncrono e 100% seguro (sem yield / sem Wait, pode ser chamado em qualquer lugar)
+local function ResetComboState()
+    SetTimeScale(1.0)
+    RenderScriptCams(false, false, 0, true, true)
+    DestroyAllCams(true)
+    currentCinematicCam = nil
+    ClearFocus()
+    local ped = PlayerPedId()
+    SetPedCanRagdoll(ped, true)
+    SetEntityInvincible(ped, false)
+    isCinematicComboActive = false
+    isAimingCombo = false
+end
+
+-- Finalização suave de câmeras e desativação automática após o combo
+local function FinishCinematicCamSmooth()
+    SetTimeScale(1.0)
+    if currentCinematicCam and DoesCamExist(currentCinematicCam) then
+        RenderScriptCams(false, true, 600, true, true)
+        Wait(600)
+        DestroyCam(currentCinematicCam, false)
+        currentCinematicCam = nil
+    else
+        RenderScriptCams(false, false, 0, true, true)
+    end
+    ResetComboState()
+end
+
+-- Busca o ped mais próximo do ponto mirado no solo/objeto usando GetGamePool('CPed')
+local function GetClosestPedToCoords(coords, radius, ignorePed)
+    local bestPed = nil
+    local bestDist = radius or 4.5
+    for _, p in ipairs(GetGamePool('CPed')) do
+        if DoesEntityExist(p) and p ~= ignorePed and not IsPedDeadOrDying(p, true) then
+            local pPos = GetEntityCoords(p)
+            local d = #(pPos - coords)
+            if d < bestDist then
+                bestDist = d
+                bestPed = p
+            end
+        end
+    end
+    return bestPed
+end
+
+-- =========================================================================
+-- OPÇÃO A: BLINK STRIKE (COMBO TELEPORTE 3-HIT CINEMATOGRÁFICO)
+-- =========================================================================
+
+local function ExecuteBlinkStrike(targetPed)
+    CreateThread(function()
+        local attacker = PlayerPedId()
+        if not DoesEntityExist(targetPed) or IsPedDeadOrDying(targetPed, true) then
+            Notify('Combate', 'Alvo inválido!', 'error')
+            ResetComboState()
+            return
+        end
+
+        isCinematicComboActive = true
+        SetPedCanRagdoll(attacker, false)
+        SetEntityInvincible(attacker, true)
+
+        -- Pré-carrega animações essenciais
+        RequestAnim("melee@unarmed@streamed_core")
+        RequestAnim("melee@large_wpn@streamed_core")
+        LoadPtfx("core")
+        LoadPtfx("scr_powerplay")
+
+        local isVictimPlayer = IsPedAPlayer(targetPed)
+        local victimServerId = nil
+        if isVictimPlayer then
+            local pIndex = NetworkGetPlayerIndexFromPed(targetPed)
+            if pIndex ~= -1 then
+                victimServerId = GetPlayerServerId(pIndex)
+            end
+        end
+
+        local tCoords = GetEntityCoords(targetPed)
+        local tHeading = GetEntityHeading(targetPed)
+        local rad = math.rad(tHeading)
+        local tForward = vector3(-math.sin(rad), math.cos(rad), 0.0)
+        local tRight = vector3(math.cos(rad), math.sin(rad), 0.0)
+
+        -- -------------------------------------------------------------
+        -- HIT 1: PELAS COSTAS (Flash-step atrás + gancho na nuca)
+        -- -------------------------------------------------------------
+        local aCoords = GetEntityCoords(attacker)
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("ent_dst_elec_fire_sp", aCoords.x, aCoords.y, aCoords.z + 0.5, 0.0, 0.0, 0.0, 1.2, false, false, false)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
+
+        -- Posiciona atacante 0.85m atrás da vítima
+        local hit1Pos = tCoords - (tForward * 0.85)
+        SetEntityCoordsNoOffset(attacker, hit1Pos.x, hit1Pos.y, hit1Pos.z, false, false, false)
+        SetEntityHeading(attacker, tHeading)
+
+        -- Câmera cinematográfica over-the-shoulder
+        local camPos1 = hit1Pos - (tForward * 1.6) + (tRight * 0.65) + vector3(0.0, 0.0, 0.85)
+        currentCinematicCam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", camPos1.x, camPos1.y, camPos1.z, 0.0, 0.0, 0.0, 62.0, true, 2)
+        PointCamAtCoord(currentCinematicCam, tCoords.x, tCoords.y, tCoords.z + 0.65)
+        SetCamActive(currentCinematicCam, true)
+        RenderScriptCams(true, true, 120, true, true)
+
+        -- Executa golpe forte na nuca (acelerado a 2.4x)
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "melee@unarmed@streamed_core", "heavy_punch_b", 8.0, -8.0, 600, 0, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "melee@unarmed@streamed_core", "heavy_punch_b", 2.4)
+
+        -- Frame de impacto imediato
+        Wait(140)
+        PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
+        ShakeCam(currentCinematicCam, "HAND_SHAKE", 0.6)
+
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("ent_dst_elec_fire_sp", tCoords.x, tCoords.y, tCoords.z + 0.65, 0.0, 0.0, 0.0, 1.2, false, false, false)
+
+        local dmg1 = Config.BlinkStrike.DanoHit1 or 25
+        if isVictimPlayer and victimServerId then
+            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'blinkstrike', 'hit1', dmg1)
+        else
+            ClearPedTasksImmediately(targetPed)
+            TaskPlayAnim(targetPed, "melee@unarmed@streamed_core", "hit_heavy_r", 8.0, -8.0, 500, 0, 0.0, false, false, false)
+            ApplyDamageToPed(targetPed, dmg1, false)
+            local curHp = GetEntityHealth(targetPed)
+            SetEntityHealth(targetPed, math.max(0, curHp - dmg1))
+        end
+
+        -- -------------------------------------------------------------
+        -- HIT 2: DO ALTO (Teleporte Aéreo + Downward Axe Hammer Slam)
+        -- -------------------------------------------------------------
+        Wait(380)
+        UseParticleFxAssetNextCall("scr_powerplay")
+        StartParticleFxNonLoopedAtCoord("sp_powerplay_beast_appear_trails", hit1Pos.x, hit1Pos.y, hit1Pos.z + 0.5, 0.0, 0.0, 0.0, 1.0, false, false, false)
+
+        -- Reaparece a 3.2m de altura sobre a vítima
+        local hit2Pos = tCoords + vector3(0.0, 0.0, 3.2)
+        SetEntityCoordsNoOffset(attacker, hit2Pos.x, hit2Pos.y, hit2Pos.z, false, false, false)
+        SetEntityHeading(attacker, tHeading)
+
+        -- Câmera em ângulo baixo olhando para cima
+        local camPos2 = tCoords + (tForward * 2.2) - (tRight * 0.8) - vector3(0.0, 0.0, 0.2)
+        SetCamParams(currentCinematicCam, camPos2.x, camPos2.y, camPos2.z, 0.0, 0.0, 0.0, 56.0, 180, 0, 0, 2)
+        PointCamAtCoord(currentCinematicCam, tCoords.x, tCoords.y, tCoords.z + 1.8)
+
+        -- Martelo descendente vertical pesado (2.5x)
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 8.0, -8.0, 800, 0, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 2.5)
+
+        -- Descida vertiginosa ao chão
+        Wait(190)
+        SetEntityCoordsNoOffset(attacker, tCoords.x - (tForward.x * 0.3), tCoords.y - (tForward.y * 0.3), tCoords.z, false, false, false)
+
+        -- Impacto pesado no solo
+        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+        ShakeCam(currentCinematicCam, "LARGE_EXPLOSION_SHAKE", 0.9)
+        TriggerServerEvent('lumina_poderes:server:syncComboEffects', tCoords, 'slam_crater')
+
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_sticky", tCoords.x, tCoords.y, tCoords.z, 0.0, 0.0, 0.0, 1.4, false, false, false)
+
+        local dmg2 = Config.BlinkStrike.DanoHit2 or 35
+        if isVictimPlayer and victimServerId then
+            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'blinkstrike', 'hit2', dmg2)
+        else
+            SetPedToRagdoll(targetPed, 1400, 1400, 0, false, false, false)
+            ApplyDamageToPed(targetPed, dmg2, false)
+            local curHp = GetEntityHealth(targetPed)
+            SetEntityHealth(targetPed, math.max(0, curHp - dmg2))
+        end
+
+        -- -------------------------------------------------------------
+        -- HIT 3: FINISHER FRONTAL (Slow-Mo + Soco de Impacto Devastador)
+        -- -------------------------------------------------------------
+        Wait(420)
+        local curVictimPos = GetEntityCoords(targetPed)
+        local oppHeading = (tHeading + 180.0) % 360.0
+        local hit3Pos = curVictimPos + (tForward * 1.25)
+        SetEntityCoordsNoOffset(attacker, hit3Pos.x, hit3Pos.y, curVictimPos.z, false, false, false)
+        SetEntityHeading(attacker, oppHeading)
+
+        -- Câmera cinematográfica lateral em close-up
+        local camPos3 = curVictimPos + (tRight * 2.2) + vector3(0.0, 0.0, 0.4)
+        SetCamParams(currentCinematicCam, camPos3.x, camPos3.y, camPos3.z, 0.0, 0.0, 0.0, 44.0, 180, 0, 0, 2)
+        PointCamAtCoord(currentCinematicCam, curVictimPos.x, curVictimPos.y, curVictimPos.z + 0.3)
+
+        -- Efeito Slow-Motion estilo Matrix
+        if Config.BlinkStrike.SlowMotion then
+            SetTimeScale(0.18)
+            StartScreenEffect("DrugsDrivingIn", 350, false)
+        end
+
+        -- Preparação rápida do soco reto
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "melee@unarmed@streamed_core", "heavy_punch_a", 8.0, -8.0, 1000, 0, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "melee@unarmed@streamed_core", "heavy_punch_a", 2.4)
+
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedOnPedBone("ent_dst_elec_fire_sp", attacker, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 60309, 1.2, false, false, false)
+
+        Wait(170)
+
+        -- SNAP: Retorno seco à velocidade normal com explosão de força
+        SetTimeScale(1.0)
+        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+        StartScreenEffect("CamPushInNeutral", 200, false)
+        ShakeCam(currentCinematicCam, "LARGE_EXPLOSION_SHAKE", 1.5)
+
+        -- Onda de choque saindo do peito do adversário
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_sticky", curVictimPos.x, curVictimPos.y, curVictimPos.z + 0.5, 0.0, 0.0, 0.0, 2.0, false, false, false)
+        TriggerServerEvent('lumina_poderes:server:syncComboEffects', curVictimPos, 'punch_shockwave')
+
+        local launchDir = -tForward
+        local force = Config.BlinkStrike.ForcaArremesso or 32.0
+        local dmg3 = Config.BlinkStrike.DanoHit3 or 65
+
+        if isVictimPlayer and victimServerId then
+            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'blinkstrike', 'hit3', dmg3, {
+                x = launchDir.x * force,
+                y = launchDir.y * force,
+                z = 8.0
+            })
+        else
+            ApplyDamageToPed(targetPed, dmg3, false)
+            local curHp = GetEntityHealth(targetPed)
+            SetEntityHealth(targetPed, math.max(0, curHp - dmg3))
+            SetPedToRagdoll(targetPed, 5000, 5000, 0, false, false, false)
+            ApplyForceToEntity(targetPed, 1, launchDir.x * 45.0, launchDir.y * 45.0, 12.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        end
+
+        PointCamAtEntity(currentCinematicCam, targetPed, 0.0, 0.0, 0.0, true)
+        Wait(450)
+
+        FinishCinematicCamSmooth()
+    end)
+end
+
+-- =========================================================================
+-- OPÇÃO B: AGARRÃO DEVASTADOR (CHOKE SLAM CINEMATOGRÁFICO)
+-- =========================================================================
+
+local function ExecuteChokeSlam(targetPed)
+    CreateThread(function()
+        local attacker = PlayerPedId()
+        if not DoesEntityExist(targetPed) or IsPedDeadOrDying(targetPed, true) then
+            Notify('Combate', 'Alvo inválido!', 'error')
+            ResetComboState()
+            return
+        end
+
+        isCinematicComboActive = true
+        SetPedCanRagdoll(attacker, false)
+        SetEntityInvincible(attacker, true)
+
+        RequestAnim("rcmextreme2")
+        RequestAnim("melee@large_wpn@streamed_core")
+        LoadPtfx("core")
+        LoadPtfx("scr_powerplay")
+
+        local isVictimPlayer = IsPedAPlayer(targetPed)
+        local victimServerId = nil
+        if isVictimPlayer then
+            local pIndex = NetworkGetPlayerIndexFromPed(targetPed)
+            if pIndex ~= -1 then
+                victimServerId = GetPlayerServerId(pIndex)
+            end
+        end
+
+        local tCoords = GetEntityCoords(targetPed)
+        local tHeading = GetEntityHeading(targetPed)
+        local rad = math.rad(tHeading)
+        local tForward = vector3(-math.sin(rad), math.cos(rad), 0.0)
+        local tRight = vector3(math.cos(rad), math.sin(rad), 0.0)
+
+        -- Câmera lateral dramática
+        local camPos = tCoords + (tRight * 2.6) + (tForward * 1.4) + vector3(0.0, 0.0, 0.75)
+        currentCinematicCam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", camPos.x, camPos.y, camPos.z, 0.0, 0.0, 0.0, 55.0, true, 2)
+        PointCamAtCoord(currentCinematicCam, tCoords.x, tCoords.y, tCoords.z + 0.6)
+        SetCamActive(currentCinematicCam, true)
+        RenderScriptCams(true, true, 180, true, true)
+
+        -- Dash sonoro até o adversário
+        local grabPos = tCoords + (tForward * 0.75)
+        UseParticleFxAssetNextCall("scr_powerplay")
+        StartParticleFxNonLoopedAtCoord("sp_powerplay_beast_appear_trails", grabPos.x, grabPos.y, grabPos.z + 0.5, 0.0, 0.0, 0.0, 1.0, false, false, false)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
+        SetEntityCoordsNoOffset(attacker, grabPos.x, grabPos.y, grabPos.z, false, false, false)
+        SetEntityHeading(attacker, (tHeading + 180.0) % 360.0)
+
+        -- Agarra o pescoço da vítima no ar
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "rcmextreme2", "loop_punching", 8.0, -8.0, 1400, 49, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "rcmextreme2", "loop_punching", 0.5)
+
+        if isVictimPlayer and victimServerId then
+            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'chokeslam', 'chokegrab', 0)
+        else
+            AttachEntityToEntity(targetPed, attacker, GetPedBoneIndex(attacker, 60309), 0.0, 0.45, 0.4, 0.0, 0.0, 180.0, false, false, false, false, 2, true)
+        end
+
+        PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
+
+        -- Eleva a vítima mais alto com aura de energia queimando na garganta
+        Wait(400)
+        if not isVictimPlayer then
+            AttachEntityToEntity(targetPed, attacker, GetPedBoneIndex(attacker, 60309), 0.0, 0.45, 0.65, 0.0, 0.0, 180.0, false, false, false, false, 2, true)
+        end
+
+        PointCamAtCoord(currentCinematicCam, tCoords.x, tCoords.y, tCoords.z + 1.3)
+
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedOnPedBone("ent_dst_elec_fire_sp", attacker, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 60309, 1.4, false, false, false)
+
+        Wait(800)
+
+        -- Salto e ESMAGAMENTO violento contra o chão
+        if not isVictimPlayer then
+            DetachEntity(targetPed, true, true)
+        end
+
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 8.0, -8.0, 1000, 0, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 2.6)
+
+        Wait(220)
+
+        -- Impacto cataclísmico
+        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+        ShakeCam(currentCinematicCam, "LARGE_EXPLOSION_SHAKE", 1.4)
+        TriggerServerEvent('lumina_poderes:server:syncComboEffects', tCoords, 'slam_crater')
+
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_sticky", tCoords.x, tCoords.y, tCoords.z, 0.0, 0.0, 0.0, 1.8, false, false, false)
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("ent_dst_elec_fire_sp", tCoords.x, tCoords.y, tCoords.z + 0.3, 0.0, 0.0, 0.0, 1.5, false, false, false)
+
+        local dmg = Config.ChokeSlam.Dano or 85
+        if isVictimPlayer and victimServerId then
+            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'chokeslam', 'chokeslam', dmg)
+        else
+            ApplyDamageToPed(targetPed, dmg, false)
+            local curHp = GetEntityHealth(targetPed)
+            SetEntityHealth(targetPed, math.max(0, curHp - dmg))
+            SetPedToRagdoll(targetPed, 4500, 4500, 0, false, false, false)
+            ApplyForceToEntity(targetPed, 1, -tForward.x * 22.0, -tForward.y * 22.0, 3.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        end
+
+        Wait(400)
+
+        FinishCinematicCamSmooth()
+    end)
+end
+
+-- =========================================================================
+-- OPÇÃO C: CHUVA DE GOLPES RÁPIDOS (BARRAGE / ORA ORA)
+-- =========================================================================
+
+local function ExecuteBarrage(targetPed)
+    CreateThread(function()
+        local attacker = PlayerPedId()
+        if not DoesEntityExist(targetPed) or IsPedDeadOrDying(targetPed, true) then
+            Notify('Combate', 'Alvo inválido!', 'error')
+            ResetComboState()
+            return
+        end
+
+        isCinematicComboActive = true
+        SetPedCanRagdoll(attacker, false)
+        SetEntityInvincible(attacker, true)
+
+        RequestAnim("rcmextreme2")
+        RequestAnim("melee@unarmed@streamed_core")
+        LoadPtfx("core")
+
+        local isVictimPlayer = IsPedAPlayer(targetPed)
+        local victimServerId = nil
+        if isVictimPlayer then
+            local pIndex = NetworkGetPlayerIndexFromPed(targetPed)
+            if pIndex ~= -1 then
+                victimServerId = GetPlayerServerId(pIndex)
+            end
+        end
+
+        local tCoords = GetEntityCoords(targetPed)
+        local tHeading = GetEntityHeading(targetPed)
+        local rad = math.rad(tHeading)
+        local tForward = vector3(-math.sin(rad), math.cos(rad), 0.0)
+        local tRight = vector3(math.cos(rad), math.sin(rad), 0.0)
+
+        -- Posiciona atacante 1.1m na frente do alvo
+        local standPos = tCoords + (tForward * 1.1)
+        SetEntityCoordsNoOffset(attacker, standPos.x, standPos.y, standPos.z, false, false, false)
+        SetEntityHeading(attacker, (tHeading + 180.0) % 360.0)
+
+        -- Câmera frontal / lateral dinâmica estilo jogo de luta
+        local camPos = tCoords + (tRight * 1.8) + (tForward * 1.5) + vector3(0.0, 0.0, 0.5)
+        currentCinematicCam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", camPos.x, camPos.y, camPos.z, 0.0, 0.0, 0.0, 52.0, true, 2)
+        PointCamAtCoord(currentCinematicCam, tCoords.x, tCoords.y, tCoords.z + 0.55)
+        SetCamActive(currentCinematicCam, true)
+        RenderScriptCams(true, true, 180, true, true)
+
+        -- Inicia sequência frenética de socos (2.6x de velocidade)
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "rcmextreme2", "loop_punching", 8.0, -8.0, 2500, 49, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "rcmextreme2", "loop_punching", 2.6)
+
+        local totalPunches = Config.Barrage.QtdSocos or 18
+        local dmgPerPunch = Config.Barrage.DanoPorSoco or 4
+
+        for i = 1, totalPunches do
+            local bone = (i % 2 == 0) and 60309 or 18905
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedOnPedBone("ent_dst_elec_fire_sp", attacker, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bone, 0.8, false, false, false)
+
+            PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
+            ShakeCam(currentCinematicCam, "HAND_SHAKE", 0.35)
+
+            if isVictimPlayer and victimServerId then
+                TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'barrage', 'hit', dmgPerPunch)
+            else
+                TaskPlayAnim(targetPed, "melee@unarmed@streamed_core", "hit_heavy_l", 8.0, -8.0, 120, 0, 0.0, false, false, false)
+                ApplyDamageToPed(targetPed, dmgPerPunch, false)
+                local curHp = GetEntityHealth(targetPed)
+                SetEntityHealth(targetPed, math.max(0, curHp - dmgPerPunch))
+            end
+
+            Wait(110)
+        end
+
+        -- Pausa dramática para o golpe final
+        Wait(90)
+
+        if Config.Barrage.SlowMotionFinisher then
+            SetTimeScale(0.25)
+        end
+
+        -- Golpe de palmas duplas / onda de choque frontal
+        ClearPedTasksImmediately(attacker)
+        TaskPlayAnim(attacker, "melee@unarmed@streamed_core", "heavy_punch_a", 8.0, -8.0, 800, 0, 0.0, false, false, false)
+        SetEntityAnimSpeed(attacker, "melee@unarmed@streamed_core", "heavy_punch_a", 2.6)
+
+        Wait(160)
+
+        SetTimeScale(1.0)
+        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+        ShakeCam(currentCinematicCam, "LARGE_EXPLOSION_SHAKE", 1.3)
+
+        -- Onda de choque no peito
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_sticky", tCoords.x, tCoords.y, tCoords.z + 0.6, 0.0, 0.0, 0.0, 1.8, false, false, false)
+        TriggerServerEvent('lumina_poderes:server:syncComboEffects', tCoords, 'punch_shockwave')
+
+        local launchDir = -tForward
+        local finDmg = Config.Barrage.DanoFinisher or 55
+        local finForce = Config.Barrage.ForcaArremesso or 25.0
+
+        if isVictimPlayer and victimServerId then
+            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'barrage', 'finish', finDmg, {
+                x = launchDir.x * finForce,
+                y = launchDir.y * finForce,
+                z = 6.0
+            })
+        else
+            ApplyDamageToPed(targetPed, finDmg, false)
+            local curHp = GetEntityHealth(targetPed)
+            SetEntityHealth(targetPed, math.max(0, curHp - finDmg))
+            SetPedToRagdoll(targetPed, 4500, 4500, 0, false, false, false)
+            ApplyForceToEntity(targetPed, 1, launchDir.x * 32.0, launchDir.y * 32.0, 8.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        end
+
+        Wait(400)
+
+        FinishCinematicCamSmooth()
+    end)
+end
+
+-- =========================================================================
+-- OPÇÃO D: COMBO EM ÁREA / MASSACRE MULTI-ALVO (LOMAR DEV)
+-- =========================================================================
+
+local function ExecuteComboArea(victimList, centerCoords)
+    CreateThread(function()
+        local attacker = PlayerPedId()
+        if not victimList or #victimList == 0 then
+            Notify('Combo em Área', 'Nenhum alvo na área!', 'error')
+            ResetComboState()
+            return
+        end
+
+        isCinematicComboActive = true
+        SetPedCanRagdoll(attacker, false)
+        SetEntityInvincible(attacker, true)
+
+        -- Pré-carrega animações e efeitos
+        RequestAnim("melee@unarmed@streamed_core")
+        RequestAnim("melee@large_wpn@streamed_core")
+        RequestAnim("rcmextreme2")
+        LoadPtfx("core")
+        LoadPtfx("scr_powerplay")
+
+        local totalVictims = #victimList
+        local elevatedThreshold = Config.ComboArea.CameraElevadaIndex or 5
+        local isCameraElevated = false
+
+        -- Inicializa a câmera cinematográfica focando a área
+        local initCamPos = centerCoords + vector3(0.0, -9.0, 4.5)
+        currentCinematicCam = CreateCamWithParams("DEFAULT_SCRIPTED_CAMERA", initCamPos.x, initCamPos.y, initCamPos.z, 0.0, 0.0, 0.0, 60.0, true, 2)
+        PointCamAtCoord(currentCinematicCam, centerCoords.x, centerCoords.y, centerCoords.z + 0.8)
+        SetCamActive(currentCinematicCam, true)
+        RenderScriptCams(true, true, 180, true, true)
+
+        local dmg = Config.ComboArea.DanoPorAlvo or 70
+
+        for idx, targetPed in ipairs(victimList) do
+            if DoesEntityExist(targetPed) and not IsPedDeadOrDying(targetPed, true) then
+                local tCoords = GetEntityCoords(targetPed)
+                local tHeading = GetEntityHeading(targetPed)
+                local rad = math.rad(tHeading)
+                local tForward = vector3(-math.sin(rad), math.cos(rad), 0.0)
+                local tRight = vector3(math.cos(rad), math.sin(rad), 0.0)
+
+                local isVictimPlayer = IsPedAPlayer(targetPed)
+                local victimServerId = nil
+                if isVictimPlayer then
+                    local pIndex = NetworkGetPlayerIndexFromPed(targetPed)
+                    if pIndex ~= -1 then
+                        victimServerId = GetPlayerServerId(pIndex)
+                    end
+                end
+
+                -- Gestão da câmera: close-up dinâmico até a 4ª vítima, depois visão aérea elevada
+                if idx < elevatedThreshold then
+                    -- Câmera de corte rápido próxima
+                    local closeCam = tCoords + (tRight * 2.2) - (tForward * 1.5) + vector3(0.0, 0.0, 0.7)
+                    SetCamParams(currentCinematicCam, closeCam.x, closeCam.y, closeCam.z, 0.0, 0.0, 0.0, 55.0, 120, 0, 0, 2)
+                    PointCamAtCoord(currentCinematicCam, tCoords.x, tCoords.y, tCoords.z + 0.5)
+                else
+                    -- A partir da 5ª vítima: eleva a câmera para o céu (visão panorâmica de massacre)
+                    if not isCameraElevated then
+                        isCameraElevated = true
+                        local highCamPos = centerCoords + vector3(0.0, -14.0, 14.0)
+                        SetCamParams(currentCinematicCam, highCamPos.x, highCamPos.y, highCamPos.z, -45.0, 0.0, 0.0, 65.0, 400, 0, 0, 2)
+                        PointCamAtCoord(currentCinematicCam, centerCoords.x, centerCoords.y, centerCoords.z + 0.5)
+                    end
+                end
+
+                -- Rastro elétrico e som de teleporte
+                UseParticleFxAssetNextCall("scr_powerplay")
+                StartParticleFxNonLoopedAtCoord("sp_powerplay_beast_appear_trails", tCoords.x, tCoords.y, tCoords.z + 0.4, 0.0, 0.0, 0.0, 1.0, false, false, false)
+                PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
+
+                local isFinalVictim = (idx == totalVictims)
+
+                if isFinalVictim then
+                    -- ---------------------------------------------------------
+                    -- GOLPE FINAL CLIMÁTICO (Slow-Mo + Super Impacto no Solo)
+                    -- ---------------------------------------------------------
+                    local hitFinalPos = tCoords + vector3(0.0, 0.0, 3.2)
+                    SetEntityCoordsNoOffset(attacker, hitFinalPos.x, hitFinalPos.y, hitFinalPos.z, false, false, false)
+                    SetEntityHeading(attacker, tHeading)
+
+                    ClearPedTasksImmediately(attacker)
+                    TaskPlayAnim(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 8.0, -8.0, 800, 0, 0.0, false, false, false)
+                    SetEntityAnimSpeed(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 2.6)
+
+                    Wait(140)
+                    SetEntityCoordsNoOffset(attacker, tCoords.x - (tForward.x * 0.3), tCoords.y - (tForward.y * 0.3), tCoords.z, false, false, false)
+
+                    -- Slow motion de impacto
+                    SetTimeScale(0.2)
+                    Wait(80)
+                    SetTimeScale(1.0)
+
+                    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+                    ShakeCam(currentCinematicCam, "LARGE_EXPLOSION_SHAKE", 1.5)
+                    StartScreenEffect("CamPushInNeutral", 200, false)
+
+                    UseParticleFxAssetNextCall("core")
+                    StartParticleFxNonLoopedAtCoord("exp_grd_sticky", tCoords.x, tCoords.y, tCoords.z, 0.0, 0.0, 0.0, 2.0, false, false, false)
+                    TriggerServerEvent('lumina_poderes:server:syncComboEffects', tCoords, 'slam_crater')
+
+                    if isVictimPlayer and victimServerId then
+                        TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'comboarea', 'hit', dmg + 30, {
+                            x = -tForward.x * 40.0,
+                            y = -tForward.y * 40.0,
+                            z = 10.0
+                        })
+                    else
+                        ApplyDamageToPed(targetPed, dmg + 30, false)
+                        local curHp = GetEntityHealth(targetPed)
+                        SetEntityHealth(targetPed, math.max(0, curHp - (dmg + 30)))
+                        SetPedToRagdoll(targetPed, 5000, 5000, 0, false, false, false)
+                        ApplyForceToEntity(targetPed, 1, -tForward.x * 40.0, -tForward.y * 40.0, 10.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                    end
+
+                    Wait(350)
+                else
+                    -- ---------------------------------------------------------
+                    -- GOLPES ALTERNADOS (Blink Punch, Axe Hammer, Micro-Barrage, Choke Throw)
+                    -- ---------------------------------------------------------
+                    local pattern = (idx % 4)
+
+                    if pattern == 1 then
+                        -- Blitz Hook pelas Costas
+                        local strikePos = tCoords - (tForward * 0.85)
+                        SetEntityCoordsNoOffset(attacker, strikePos.x, strikePos.y, strikePos.z, false, false, false)
+                        SetEntityHeading(attacker, tHeading)
+
+                        ClearPedTasksImmediately(attacker)
+                        TaskPlayAnim(attacker, "melee@unarmed@streamed_core", "heavy_punch_b", 8.0, -8.0, 400, 0, 0.0, false, false, false)
+                        SetEntityAnimSpeed(attacker, "melee@unarmed@streamed_core", "heavy_punch_b", 2.8)
+
+                        Wait(90)
+                        PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
+                        ShakeCam(currentCinematicCam, "HAND_SHAKE", 0.4)
+
+                        UseParticleFxAssetNextCall("core")
+                        StartParticleFxNonLoopedAtCoord("ent_dst_elec_fire_sp", tCoords.x, tCoords.y, tCoords.z + 0.6, 0.0, 0.0, 0.0, 1.0, false, false, false)
+
+                        if isVictimPlayer and victimServerId then
+                            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'comboarea', 'hit', dmg, {
+                                x = -tForward.x * 28.0,
+                                y = -tForward.y * 28.0,
+                                z = 6.0
+                            })
+                        else
+                            ApplyDamageToPed(targetPed, dmg, false)
+                            local curHp = GetEntityHealth(targetPed)
+                            SetEntityHealth(targetPed, math.max(0, curHp - dmg))
+                            SetPedToRagdoll(targetPed, 4000, 4000, 0, false, false, false)
+                            ApplyForceToEntity(targetPed, 1, -tForward.x * 28.0, -tForward.y * 28.0, 6.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                        end
+                        Wait(140)
+
+                    elseif pattern == 2 then
+                        -- Martelo do Alto
+                        local strikePos = tCoords + vector3(0.0, 0.0, 2.6)
+                        SetEntityCoordsNoOffset(attacker, strikePos.x, strikePos.y, strikePos.z, false, false, false)
+                        SetEntityHeading(attacker, tHeading)
+
+                        ClearPedTasksImmediately(attacker)
+                        TaskPlayAnim(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 8.0, -8.0, 500, 0, 0.0, false, false, false)
+                        SetEntityAnimSpeed(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 2.8)
+
+                        Wait(110)
+                        SetEntityCoordsNoOffset(attacker, tCoords.x - (tForward.x * 0.3), tCoords.y - (tForward.y * 0.3), tCoords.z, false, false, false)
+
+                        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+                        ShakeCam(currentCinematicCam, "LARGE_EXPLOSION_SHAKE", 0.6)
+
+                        UseParticleFxAssetNextCall("core")
+                        StartParticleFxNonLoopedAtCoord("exp_grd_sticky", tCoords.x, tCoords.y, tCoords.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
+
+                        if isVictimPlayer and victimServerId then
+                            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'comboarea', 'hit', dmg, {
+                                x = tForward.x * 12.0,
+                                y = tForward.y * 12.0,
+                                z = -6.0
+                            })
+                        else
+                            ApplyDamageToPed(targetPed, dmg, false)
+                            local curHp = GetEntityHealth(targetPed)
+                            SetEntityHealth(targetPed, math.max(0, curHp - dmg))
+                            SetPedToRagdoll(targetPed, 4000, 4000, 0, false, false, false)
+                            ApplyForceToEntity(targetPed, 1, tForward.x * 12.0, tForward.y * 12.0, -6.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                        end
+                        Wait(150)
+
+                    elseif pattern == 3 then
+                        -- Micro Barrage Frontal de 4 Socos Rápidos + Impulso
+                        local strikePos = tCoords + (tForward * 1.05)
+                        SetEntityCoordsNoOffset(attacker, strikePos.x, strikePos.y, strikePos.z, false, false, false)
+                        SetEntityHeading(attacker, (tHeading + 180.0) % 360.0)
+
+                        ClearPedTasksImmediately(attacker)
+                        TaskPlayAnim(attacker, "rcmextreme2", "loop_punching", 8.0, -8.0, 600, 49, 0.0, false, false, false)
+                        SetEntityAnimSpeed(attacker, "rcmextreme2", "loop_punching", 3.0)
+
+                        PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
+                        Wait(100)
+
+                        -- Soco de finalização
+                        ClearPedTasksImmediately(attacker)
+                        TaskPlayAnim(attacker, "melee@unarmed@streamed_core", "heavy_punch_a", 8.0, -8.0, 400, 0, 0.0, false, false, false)
+                        SetEntityAnimSpeed(attacker, "melee@unarmed@streamed_core", "heavy_punch_a", 2.6)
+
+                        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+                        ShakeCam(currentCinematicCam, "HAND_SHAKE", 0.5)
+
+                        UseParticleFxAssetNextCall("core")
+                        StartParticleFxNonLoopedAtCoord("exp_grd_sticky", tCoords.x, tCoords.y, tCoords.z + 0.5, 0.0, 0.0, 0.0, 1.2, false, false, false)
+
+                        if isVictimPlayer and victimServerId then
+                            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'comboarea', 'hit', dmg, {
+                                x = -tForward.x * 32.0,
+                                y = -tForward.y * 32.0,
+                                z = 7.0
+                            })
+                        else
+                            ApplyDamageToPed(targetPed, dmg, false)
+                            local curHp = GetEntityHealth(targetPed)
+                            SetEntityHealth(targetPed, math.max(0, curHp - dmg))
+                            SetPedToRagdoll(targetPed, 4500, 4500, 0, false, false, false)
+                            ApplyForceToEntity(targetPed, 1, -tForward.x * 32.0, -tForward.y * 32.0, 7.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                        end
+                        Wait(160)
+
+                    else
+                        -- Arremesso de Pescoço Violento
+                        local strikePos = tCoords + (tForward * 0.75)
+                        SetEntityCoordsNoOffset(attacker, strikePos.x, strikePos.y, strikePos.z, false, false, false)
+                        SetEntityHeading(attacker, (tHeading + 180.0) % 360.0)
+
+                        ClearPedTasksImmediately(attacker)
+                        TaskPlayAnim(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 8.0, -8.0, 500, 0, 0.0, false, false, false)
+                        SetEntityAnimSpeed(attacker, "melee@large_wpn@streamed_core", "ground_attack_on_spot", 2.8)
+
+                        PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
+                        ShakeCam(currentCinematicCam, "HAND_SHAKE", 0.4)
+
+                        UseParticleFxAssetNextCall("core")
+                        StartParticleFxNonLoopedAtCoord("ent_dst_elec_fire_sp", tCoords.x, tCoords.y, tCoords.z + 0.4, 0.0, 0.0, 0.0, 1.2, false, false, false)
+
+                        if isVictimPlayer and victimServerId then
+                            TriggerServerEvent('lumina_poderes:server:syncComboHit', victimServerId, 'comboarea', 'hit', dmg, {
+                                x = -tForward.x * 26.0,
+                                y = -tForward.y * 26.0,
+                                z = 5.0
+                            })
+                        else
+                            ApplyDamageToPed(targetPed, dmg, false)
+                            local curHp = GetEntityHealth(targetPed)
+                            SetEntityHealth(targetPed, math.max(0, curHp - dmg))
+                            SetPedToRagdoll(targetPed, 4000, 4000, 0, false, false, false)
+                            ApplyForceToEntity(targetPed, 1, -tForward.x * 26.0, -tForward.y * 26.0, 5.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                        end
+                        Wait(140)
+                    end
+                end
+            end
+        end
+
+        -- Pausa no ar observando todos os corpos no chão
+        Wait(400)
+
+        FinishCinematicCamSmooth()
+    end)
+end
+
+-- =========================================================================
+-- SISTEMA DE MIRA INDIVIDUAL (RAYCAST TOTAL + MARCADOR 3D)
+-- =========================================================================
+
+local function StartComboAiming(comboType)
+    ResetComboState()
+
+    local ped = PlayerPedId()
+    if IsPedDeadOrDying(ped, true) or IsPedInAnyVehicle(ped, true) then
+        Notify('Combate', 'Você não pode usar isso agora.', 'error')
+        return
+    end
+
+    isAimingCombo = true
+
+    local comboNames = {
+        blinkstrike = 'Blink Strike',
+        chokeslam = 'Agarrão Devastador',
+        barrage = 'Chuva de Golpes'
+    }
+    local name = comboNames[comboType] or 'Combo'
+
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 1.0, 1.0, -1, 49, 0.0, false, false, false)
+
+    Notify(name, 'Mire no adversário e pressione [E], [ENTER] ou [CLICK] para desferir! [ESC] cancela.', 'inform')
+
+    CreateThread(function()
+        local maxDist = 45.0
+        local startTime = GetGameTimer()
+
+        while isAimingCombo do
+            Wait(0)
+            local currentPed = PlayerPedId()
+
+            DisableControlAction(0, 200, true) -- ESC (Pause Menu)
+            DisableControlAction(0, 199, true) -- Pause
+            DisableControlAction(0, 322, true) -- ESC / Cancel
+            DisableControlAction(0, 177, true) -- Backspace
+            DisableControlAction(0, 202, true) -- Frontend Cancel
+
+            local camCoords = GetGameplayCamCoord()
+            local farCoords = GetCoordsFromCam(maxDist, camCoords)
+
+            local ray = StartExpensiveSynchronousShapeTestLosProbe(camCoords.x, camCoords.y, camCoords.z, farCoords.x, farCoords.y, farCoords.z, -1, currentPed, 7)
+            local _, hit, endCoords, _, hitEntity = GetShapeTestResult(ray)
+
+            local chosenHit = (hit and endCoords) and endCoords or farCoords
+            local detectedPed = nil
+
+            if hit and endCoords then
+                if hitEntity and DoesEntityExist(hitEntity) and IsEntityAPed(hitEntity) and hitEntity ~= currentPed and not IsPedDeadOrDying(hitEntity, true) then
+                    detectedPed = hitEntity
+                else
+                    detectedPed = GetClosestPedToCoords(endCoords, 4.5, currentPed)
+                end
+
+                if detectedPed and DoesEntityExist(detectedPed) then
+                    local tPos = GetEntityCoords(detectedPed)
+                    DrawMarker(28, tPos.x, tPos.y, tPos.z + 0.95, 0, 0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 255, 30, 30, 230, false, false, 2, nil, nil, false)
+                    DrawMarker(1, tPos.x, tPos.y, tPos.z - 0.95, 0, 0, 0, 0, 0, 0, 1.7, 1.7, 0.35, 255, 50, 50, 200, false, false, 2, nil, nil, false)
+                else
+                    DrawMarker(28, endCoords.x, endCoords.y, endCoords.z + 0.25, 0, 0, 0, 0, 0, 0, 0.55, 0.55, 0.55, 255, 210, 50, 220, false, false, 2, nil, nil, false)
+                    DrawMarker(1, endCoords.x, endCoords.y, endCoords.z - 0.3, 0, 0, 0, 0, 0, 0, 1.8, 1.8, 0.3, 255, 190, 0, 170, false, false, 2, nil, nil, false)
+                end
+            end
+
+            local canTrigger = (GetGameTimer() - startTime) > 250
+
+            if canTrigger and (IsControlJustReleased(0, 38) or IsControlJustReleased(0, 191) or IsControlJustReleased(0, 24) or IsDisabledControlJustReleased(0, 24)) then
+                isAimingCombo = false
+                ClearPedTasks(currentPed)
+
+                if detectedPed and DoesEntityExist(detectedPed) and not IsPedDeadOrDying(detectedPed, true) then
+                    if comboType == 'blinkstrike' then
+                        ExecuteBlinkStrike(detectedPed)
+                    elseif comboType == 'chokeslam' then
+                        ExecuteChokeSlam(detectedPed)
+                    elseif comboType == 'barrage' then
+                        ExecuteBarrage(detectedPed)
+                    end
+                else
+                    Notify('Combate', 'Nenhum adversário no local mirado! Aponte a mira para um NPC ou jogador.', 'error')
+                    ResetComboState()
+                end
+                break
+
+            elseif IsDisabledControlJustReleased(0, 200) or IsDisabledControlJustReleased(0, 322) or IsDisabledControlJustReleased(0, 177)
+                or IsDisabledControlJustReleased(0, 199) or IsDisabledControlJustReleased(0, 202)
+                or IsControlJustReleased(0, 177) or IsControlJustReleased(0, 200) or IsControlJustReleased(0, 322) or IsControlJustReleased(0, 73) then
+                isAimingCombo = false
+                ClearPedTasks(currentPed)
+                ResetComboState()
+                Notify('Combate', 'Mira cancelada.', 'error')
+                break
+            end
+        end
+    end)
+end
+
+-- =========================================================================
+-- SISTEMA DE MIRA EM ÁREA (MASSACRE MULTI-ALVO ATÉ 20 ENTIDADES)
+-- =========================================================================
+
+local function StartComboAreaAiming()
+    ResetComboState()
+
+    local ped = PlayerPedId()
+    if IsPedDeadOrDying(ped, true) or IsPedInAnyVehicle(ped, true) then
+        Notify('Combo em Área', 'Você não pode usar isso agora.', 'error')
+        return
+    end
+
+    isAimingCombo = true
+
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 1.0, 1.0, -1, 49, 0.0, false, false, false)
+
+    Notify('Massacre em Área', 'Mire na área dos inimigos e pressione [E], [ENTER] ou [CLICK] para massacrar! [ESC] cancela.', 'inform')
+
+    CreateThread(function()
+        local maxDist = Config.ComboArea.DistanciaMira or 45.0
+        local areaRadius = Config.ComboArea.RaioArea or 18.0
+        local maxVictims = Config.ComboArea.LimiteEntidades or 20
+        local startTime = GetGameTimer()
+
+        while isAimingCombo do
+            Wait(0)
+            local currentPed = PlayerPedId()
+
+            DisableControlAction(0, 200, true) -- ESC (Pause Menu)
+            DisableControlAction(0, 199, true) -- Pause
+            DisableControlAction(0, 322, true) -- ESC / Cancel
+            DisableControlAction(0, 177, true) -- Backspace
+            DisableControlAction(0, 202, true) -- Frontend Cancel
+
+            local camCoords = GetGameplayCamCoord()
+            local farCoords = GetCoordsFromCam(maxDist, camCoords)
+
+            local ray = StartExpensiveSynchronousShapeTestLosProbe(camCoords.x, camCoords.y, camCoords.z, farCoords.x, farCoords.y, farCoords.z, -1, currentPed, 7)
+            local _, hit, endCoords = GetShapeTestResult(ray)
+
+            local chosenCenter = (hit and endCoords) and endCoords or farCoords
+            local victimList = {}
+
+            if hit and endCoords then
+                -- Renderiza o grande perímetro de área no solo
+                DrawMarker(1, endCoords.x, endCoords.y, endCoords.z - 0.35, 0, 0, 0, 0, 0, 0, areaRadius * 2.0, areaRadius * 2.0, 0.45, 255, 30, 30, 160, false, false, 2, nil, nil, false)
+                DrawMarker(28, endCoords.x, endCoords.y, endCoords.z + 0.35, 0, 0, 0, 0, 0, 0, 0.8, 0.8, 0.8, 255, 50, 50, 220, false, false, 2, nil, nil, false)
+
+                -- Mapeia todas as entidades dentro da área demarcada
+                for _, p in ipairs(GetGamePool('CPed')) do
+                    if DoesEntityExist(p) and p ~= currentPed and not IsPedDeadOrDying(p, true) then
+                        local pPos = GetEntityCoords(p)
+                        local dist = #(pPos - endCoords)
+                        if dist <= areaRadius then
+                            table.insert(victimList, p)
+                            -- Marca cada vítima travada com uma esfera vermelha sobre a cabeça
+                            DrawMarker(28, pPos.x, pPos.y, pPos.z + 0.95, 0, 0, 0, 0, 0, 0, 0.4, 0.4, 0.4, 255, 0, 0, 220, false, false, 2, nil, nil, false)
+                            if #victimList >= maxVictims then
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+
+            local canTrigger = (GetGameTimer() - startTime) > 250
+
+            -- Disparo do Massacre em Área
+            if canTrigger and (IsControlJustReleased(0, 38) or IsControlJustReleased(0, 191) or IsControlJustReleased(0, 24) or IsDisabledControlJustReleased(0, 24)) then
+                isAimingCombo = false
+                ClearPedTasks(currentPed)
+
+                if #victimList > 0 then
+                    ExecuteComboArea(victimList, chosenCenter)
+                else
+                    Notify('Combo em Área', 'Nenhum alvo detectado dentro do raio de massacre demarcado!', 'error')
+                    ResetComboState()
+                end
+                break
+
+            -- Cancelamento
+            elseif IsDisabledControlJustReleased(0, 200) or IsDisabledControlJustReleased(0, 322) or IsDisabledControlJustReleased(0, 177)
+                or IsDisabledControlJustReleased(0, 199) or IsDisabledControlJustReleased(0, 202)
+                or IsControlJustReleased(0, 177) or IsControlJustReleased(0, 200) or IsControlJustReleased(0, 322) or IsControlJustReleased(0, 73) then
+                isAimingCombo = false
+                ClearPedTasks(currentPed)
+                ResetComboState()
+                Notify('Combo em Área', 'Mira cancelada.', 'error')
+                break
+            end
+        end
+    end)
+end
+
+-- =========================================================================
+-- REGISTRO DOS COMANDOS
+-- =========================================================================
+
+-- Opção A: Blink Strike
+RegisterCommand('blinkstrike', function()
+    StartComboAiming('blinkstrike')
+end, false)
+
+RegisterCommand('comboteleporte', function()
+    StartComboAiming('blinkstrike')
+end, false)
+
+-- Opção B: Agarrão Devastador / Choke Slam
+RegisterCommand('chokeslam', function()
+    StartComboAiming('chokeslam')
+end, false)
+
+RegisterCommand('agarrardevastador', function()
+    StartComboAiming('chokeslam')
+end, false)
+
+-- Opção C: Chuva de Golpes Rápidos / Barrage
+RegisterCommand('barrage', function()
+    StartComboAiming('barrage')
+end, false)
+
+RegisterCommand('chuvadegolpes', function()
+    StartComboAiming('barrage')
+end, false)
+
+-- Opção D: Combo em Área / Massacre Múltiplo (até 20 alvos)
+RegisterCommand('comboarea', function()
+    StartComboAreaAiming()
+end, false)
+
+RegisterCommand('massacre', function()
+    StartComboAreaAiming()
+end, false)
+
+RegisterCommand('combomultiplo', function()
+    StartComboAreaAiming()
+end, false)
+
+-- =========================================================================
+-- SINCRONIZAÇÃO EM REDE: VÍTIMA E ESPECTADORES
+-- =========================================================================
+
+RegisterNetEvent('lumina_poderes:client:onComboHitVictim', function(comboType, stage, damage, forceData, attackerSrc)
+    local ped = PlayerPedId()
+
+    if damage and damage > 0 then
+        ApplyDamageToPed(ped, damage, false)
+    end
+
+    if comboType == 'blinkstrike' then
+        if stage == 'hit1' then
+            RequestAnim("melee@unarmed@streamed_core")
+            TaskPlayAnim(ped, "melee@unarmed@streamed_core", "hit_heavy_r", 8.0, -8.0, 500, 0, 0.0, false, false, false)
+            ShakeGameplayCam('JOLT_SHAKE', 1.0)
+        elseif stage == 'hit2' then
+            SetPedToRagdoll(ped, 1200, 1200, 0, false, false, false)
+            ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.2)
+        elseif stage == 'hit3' then
+            ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 2.0)
+            local fx = forceData and forceData.x or 0.0
+            local fy = forceData and forceData.y or 0.0
+            local fz = forceData and forceData.z or 7.0
+            SetPedToRagdoll(ped, 5000, 5000, 0, false, false, false)
+            ApplyForceToEntity(ped, 1, fx, fy, fz, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        end
+    elseif comboType == 'chokeslam' then
+        if stage == 'chokegrab' then
+            ShakeGameplayCam('JOLT_SHAKE', 0.8)
+        elseif stage == 'chokeslam' then
+            ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.5)
+            SetPedToRagdoll(ped, 4500, 4500, 0, false, false, false)
+            ApplyForceToEntity(ped, 1, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        end
+    elseif comboType == 'barrage' then
+        if stage == 'hit' then
+            RequestAnim("melee@unarmed@streamed_core")
+            TaskPlayAnim(ped, "melee@unarmed@streamed_core", "hit_heavy_l", 8.0, -8.0, 120, 0, 0.0, false, false, false)
+            ShakeGameplayCam('HAND_SHAKE', 0.35)
+        elseif stage == 'finish' then
+            ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.8)
+            local fx = forceData and forceData.x or 0.0
+            local fy = forceData and forceData.y or 0.0
+            local fz = forceData and forceData.z or 6.0
+            SetPedToRagdoll(ped, 4500, 4500, 0, false, false, false)
+            ApplyForceToEntity(ped, 1, fx, fy, fz, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+        end
+    elseif comboType == 'comboarea' then
+        ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.6)
+        local fx = forceData and forceData.x or 0.0
+        local fy = forceData and forceData.y or 0.0
+        local fz = forceData and forceData.z or 8.0
+        SetPedToRagdoll(ped, 4500, 4500, 0, false, false, false)
+        ApplyForceToEntity(ped, 1, fx, fy, fz, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+    end
+end)
+
+RegisterNetEvent('lumina_poderes:client:playComboEffects', function(coords, effectType)
+    if not coords then return end
+    local pCoords = GetEntityCoords(PlayerPedId())
+    if #(pCoords - coords) > 60.0 then return end
+
+    if effectType == 'slam_crater' then
+        RequestNamedPtfxAsset("core")
+        if HasNamedPtfxAssetLoaded("core") then
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("exp_grd_sticky", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.4, false, false, false)
+        end
+    elseif effectType == 'punch_shockwave' then
+        RequestNamedPtfxAsset("core")
+        if HasNamedPtfxAssetLoaded("core") then
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("exp_grd_sticky", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 1.8, false, false, false)
+        end
+    end
+end)

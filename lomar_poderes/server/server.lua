@@ -367,3 +367,24 @@ AddEventHandler('playerDropped', function()
         TriggerClientEvent('lumina_poderes:client:syncAllPortals', -1, activePortals)
     end
 end)
+
+-- =========================================================================
+-- COMBOS CINEMATOGRÁFICOS DE COMBATE (LOMAR DEV)
+-- =========================================================================
+
+-- Sincronização de dano e reações do alvo quando for outro jogador
+RegisterNetEvent('lumina_poderes:server:syncComboHit', function(targetServerId, comboType, stage, damage, forceData)
+    local src = source
+    targetServerId = tonumber(targetServerId)
+    if targetServerId and targetServerId > 0 and GetPlayerPing(targetServerId) > 0 and targetServerId ~= src then
+        TriggerClientEvent('lumina_poderes:client:onComboHitVictim', targetServerId, comboType, stage, damage, forceData, src)
+    end
+end)
+
+-- Sincronização de efeitos visuais e sonoros dos combos para todos os jogadores ao redor
+RegisterNetEvent('lumina_poderes:server:syncComboEffects', function(coords, effectType)
+    if coords then
+        TriggerClientEvent('lumina_poderes:client:playComboEffects', -1, coords, effectType)
+    end
+end)
+

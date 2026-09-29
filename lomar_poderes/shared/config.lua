@@ -130,8 +130,9 @@ Config.EscudoMistico = {
 }
 
 Config.ClonesSombra = {
-    Quantidade = 2,
-    DuracaoMs = 10000
+    Quantidade = 4, -- 4 clones formando um círculo protetor de 360°
+    DuracaoMs = 35000, -- 35 segundos de proteção ativa ao redor do jogador
+    RaioCirculo = 2.4 -- distância do círculo protetor ao redor do personagem
 }
 
 Config.BuracoNegro = {
@@ -201,4 +202,47 @@ Config.Domo = {
 Config.OlhoMistico = {
     Raio = 45.0,
     DuracaoMs = 25000
+}
+
+-- =========================================================================
+-- COMBOS DE COMBATE CINEMATOGRÁFICOS (LOMAR DEV)
+-- =========================================================================
+
+-- Opção A: Blink Strike (Combo Teleporte 3-Hit Cinematográfico)
+Config.BlinkStrike = {
+    DistanciaMax = 25.0,
+    DanoHit1 = 25,
+    DanoHit2 = 35,
+    DanoHit3 = 65,
+    ForcaArremesso = 32.0,
+    SlowMotion = true
+}
+
+-- Opção B: Agarrão Devastador / Choke Slam Cinematográfico
+Config.ChokeSlam = {
+    DistanciaMax = 15.0,
+    Dano = 85,
+    DuracaoSufocoMs = 1200,
+    RaioImpacto = 4.5,
+    ForcaArremesso = 16.0
+}
+
+-- Opção C: Chuva de Golpes Rápidos (Barrage / Ora Ora)
+Config.Barrage = {
+    DistanciaMax = 8.0,
+    QtdSocos = 18,
+    DanoPorSoco = 4,
+    DanoFinisher = 55,
+    ForcaArremesso = 25.0,
+    SlowMotionFinisher = true
+}
+
+-- Opção D: Combo em Área / Massacre Múltiplo (LOMAR DEV)
+Config.ComboArea = {
+    DistanciaMira = 45.0,
+    RaioArea = 18.0,
+    LimiteEntidades = 20,
+    DanoPorAlvo = 70,
+    ForcaArremesso = 35.0,
+    CameraElevadaIndex = 5 -- a partir da 5ª vítima a câmera sobe para o alto mostrando toda a área
 }

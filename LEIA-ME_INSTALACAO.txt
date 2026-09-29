@@ -5,7 +5,7 @@
 ================================================================================
 
 Este pacote contem:
-1. lomar_poderes         -> Script completo com 40 poderes sobrenaturais, animacoes personalizadas, audio 3D espacial NUI, sistema de mira dinamica e particulas sincronizadas em rede (LOMAR DEV)
+1. lomar_poderes         -> Script completo com 44 poderes sobrenaturais e combos cinematográficos de combate, animacoes personalizadas, audio 3D espacial NUI, sistema de mira dinamica e particulas sincronizadas em rede (LOMAR DEV)
 2. Lupino_Lumina         -> Modelo 3D da fera Lobisomem gigante (WereWolf) com 400 HP e super forca (LOMAR DEV)
 3. Lobo_Sirius_Lumina    -> Modelo 3D do Lobo Sirius de 4 patas ágil e veloz (LOMAR DEV)
 
@@ -25,7 +25,7 @@ COMO INSTALAR NA BASE MRI:
    carregamento assinada por LOMAR DEV no console!
 
 --------------------------------------------------------------------------------
-LISTA COMPLETA DOS PODERES E COMANDOS (40 PODERES):
+LISTA COMPLETA DOS PODERES E COMANDOS (44 PODERES E COMBOS):
 --------------------------------------------------------------------------------
 TRANSFORMAÇÕES LUPINAS:
 1.  /lobisomem ou /lobao         -> Transforma seu personagem no Lobisomem gigante com
@@ -69,8 +69,8 @@ PODERES CRIATIVOS & ARCANOS AVANÇADOS:
                                     use /telecinese novamente para arremessá-lo com força devastadora!
 15. /escudo                      -> Cria uma cúpula mágica de partículas ao redor do seu corpo por 10s:
                                     imunidade total a tiros e empurra com força quem tentar encostar
-16. /clones                      -> Invoca 2 cópias idênticas a você que correm em direções opostas
-                                    para despistar inimigos e a polícia
+16. /clones                      -> Guardiões de sombra em formação circular 360° ao redor do jogador:
+                                    escoltam seus passos em tempo real, sem colisão e atacam ameaças próximas!
 17. /fantasma                    -> Transforma seu corpo em forma espectral translúcida (invisibilidade parcial),
                                     imune a dano e com velocidade aumentada por 10s
 18. /congelar [id]               -> Dispara uma rajada gélida de criomancia que congela a tela do alvo
@@ -114,12 +114,24 @@ PODERES ELEMENTAIS & MÍSTICOS:
 39. /terremoto                   -> Faz a terra tremer com estrondo de terremoto
 40. /risada ou /aterrorizar      -> Risada demoníaca que aterroriza quem estiver perto
 
+COMBOS CINEMATOGRÁFICOS DE COMBATE (LOMAR DEV):
+41. /blinkstrike ou              -> Combo Teleporte 3-Hit Cinematográfico: teleporte veloz atrás da nuca,
+    /comboteleporte                 axe hammer descendente no ar e soco reto em slow-mo lançando o alvo a 45m!
+42. /chokeslam ou                -> Agarrão Devastador: avanço com rastro de energia, estrangulamento
+    /agarrardevastador              com elevação no ar e arremesso destruidor contra o solo com cratera.
+43. /barrage ou                  -> Chuva de Golpes: 18 socos em velocidade sobre-humana (2s) com rastros
+    /chuvadegolpes                  de luz alternados nos punhos e finalização em onda de choque com as duas mãos!
+44. /comboarea ou /massacre ou   -> Massacre em Área: mira circular que trava em até 20 entidades simultâneas;
+    /combomultiplo                  executa sequência alternada de golpes e eleva a câmera orbital aos 14m a partir
+                                    do 5º alvo para registrar toda a devastação com retorno 100% automático.
+
 --------------------------------------------------------------------------------
 CONFIGURACOES (shared/config.lua):
 --------------------------------------------------------------------------------
 - Abra 'lomar_poderes/shared/config.lua' para configurar tempos, distâncias,
-  danos e curas de cada poder individualmente.
+  danos, raios e parâmetros de cada poder e combo individualmente.
 
 ================================================================================
 Desenvolvido por: LOMAR DEV | MRI Community
 ================================================================================
+=
