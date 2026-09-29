@@ -388,3 +388,12 @@ RegisterNetEvent('lumina_poderes:server:syncComboEffects', function(coords, effe
     end
 end)
 
+-- Sincronização em rede de clones para que todos os jogadores no servidor vejam a multidão
+RegisterNetEvent('lumina_poderes:server:syncClonesBatch', function(netIds)
+    local src = source
+    if netIds and #netIds > 0 then
+        TriggerClientEvent('lumina_poderes:client:onSyncClonesBatch', -1, netIds, src)
+    end
+end)
+
+

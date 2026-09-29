@@ -1650,6 +1650,7 @@ RegisterCommand('clones', function()
     local count = Config.ClonesSombra.Quantidade or 4
     local radius = Config.ClonesSombra.RaioCirculo or 2.4
     local clones = {}
+    local netIds = {}
     local angleStep = 360.0 / count
     local hp = Config.ClonesSombra and Config.ClonesSombra.Vida or 200
 
@@ -1657,11 +1658,24 @@ RegisterCommand('clones', function()
         local angleOffset = (i - 1) * angleStep
         local rad = math.rad((pHeading + angleOffset) % 360.0)
         local spawnPos = pCoords + vector3(-math.sin(rad) * radius, math.cos(rad) * radius, 0.0)
+        local cloneHeading = (pHeading + angleOffset + 180.0) % 360.0
 
-        local clone = ClonePed(ped, false, false, false)
+        -- Cria ped sincronizado na rede (isNetwork = true, bScriptHostPed = true)
+        local clone = ClonePed(ped, cloneHeading, true, true)
         if DoesEntityExist(clone) then
             SetEntityCoordsNoOffset(clone, spawnPos.x, spawnPos.y, spawnPos.z, false, false, false)
-            SetEntityHeading(clone, (pHeading + angleOffset + 180.0) % 360.0)
+            SetEntityHeading(clone, cloneHeading)
+
+            -- Registra entidade na rede para que todos os jogadores no servidor enxerguem
+            SetEntityAsMissionEntity(clone, true, true)
+            NetworkRegisterEntityAsNetworked(clone)
+            local netId = NetworkGetNetworkIdFromEntity(clone)
+            if netId and netId ~= 0 then
+                SetNetworkIdExistsOnAllMachines(netId, true)
+                SetNetworkIdCanMigrate(netId, true)
+                NetworkSetNetworkIdDynamic(netId, true)
+                table.insert(netIds, netId)
+            end
 
             -- Clones são mortais como todo NPC do servidor
             SetEntityInvincible(clone, false)
@@ -1701,7 +1715,13 @@ RegisterCommand('clones', function()
         table.insert(activeCloneGuardians, c.entity)
     end
 
+    -- Sincroniza a aparência dos clones para todos os jogadores do servidor
+    if #netIds > 0 then
+        TriggerServerEvent('lumina_poderes:server:syncClonesBatch', netIds)
+    end
+
     Notify('Clones', 'Guardiões invocados! Eles seguirão você pelo mapa até morrerem ou se perderem.', 'success')
+
 
     -- Thread de escolta contínua: seguem até morrer ou se perder no servidor como todo NPC
     CreateThread(function()
@@ -1878,6 +1898,7 @@ RegisterCommand('clonesmax', function()
     end
 
     local clones = {}
+    local netIds = {}
     local accuracy = Config.ClonesMax and Config.ClonesMax.Precisao or 75
     local maxHp = Config.ClonesMax and Config.ClonesMax.Vida or 200
     local armour = Config.ClonesMax and Config.ClonesMax.Colete or 50
@@ -1885,11 +1906,24 @@ RegisterCommand('clonesmax', function()
     for _, slot in ipairs(slots) do
         local rad = math.rad((pHeading + slot.angleOffset) % 360.0)
         local spawnPos = pCoords + vector3(-math.sin(rad) * slot.radius, math.cos(rad) * slot.radius, 0.0)
+        local cloneHeading = (pHeading + slot.angleOffset + 180.0) % 360.0
 
-        local clone = ClonePed(ped, false, false, false)
+        -- Cria ped sincronizado na rede (isNetwork = true, bScriptHostPed = true)
+        local clone = ClonePed(ped, cloneHeading, true, true)
         if DoesEntityExist(clone) then
             SetEntityCoordsNoOffset(clone, spawnPos.x, spawnPos.y, spawnPos.z, false, false, false)
-            SetEntityHeading(clone, (pHeading + slot.angleOffset + 180.0) % 360.0)
+            SetEntityHeading(clone, cloneHeading)
+
+            -- Registra entidade na rede para que todos os jogadores no servidor enxerguem
+            SetEntityAsMissionEntity(clone, true, true)
+            NetworkRegisterEntityAsNetworked(clone)
+            local netId = NetworkGetNetworkIdFromEntity(clone)
+            if netId and netId ~= 0 then
+                SetNetworkIdExistsOnAllMachines(netId, true)
+                SetNetworkIdCanMigrate(netId, true)
+                NetworkSetNetworkIdDynamic(netId, true)
+                table.insert(netIds, netId)
+            end
 
             -- Clones mortais com vida e dano real (morrem como qualquer NPC)
             SetEntityInvincible(clone, false)
@@ -1939,7 +1973,13 @@ RegisterCommand('clonesmax', function()
         table.insert(activeClonesMax, c.entity)
     end
 
+    -- Sincroniza a aparência de todos os 20 clones para todos os jogadores do servidor
+    if #netIds > 0 then
+        TriggerServerEvent('lumina_poderes:server:syncClonesBatch', netIds)
+    end
+
     Notify('Legião de Clones', 'Multidão de 20 clones armados invocada! Eles seguirão você pelo mapa até morrerem ou se perderem.', 'success')
+
 
     -- Thread de escolta contínua: seguem até morrer em combate ou se perderem no servidor como todo NPC
     CreateThread(function()
@@ -4181,3 +4221,35 @@ RegisterNetEvent('lumina_poderes:client:playComboEffects', function(coords, effe
         end
     end
 end)
+
+-- =========================================================================
+-- SINCRONIZAÇÃO DE CLONES PARA OUTROS JOGADORES NO SERVIDOR (LOMAR DEV)
+-- =========================================================================
+RegisterNetEvent('lumina_poderes:client:onSyncClonesBatch', function(netIds, ownerServerId)
+    local ownerPlayer = GetPlayerFromServerId(ownerServerId)
+    if ownerPlayer == -1 or ownerPlayer == PlayerId() then return end
+
+    CreateThread(function()
+        local ownerPed = GetPlayerPed(ownerPlayer)
+        local myPed = PlayerPedId()
+
+        for _, netId in ipairs(netIds) do
+            local timeout = 0
+            local clonePed = NetworkGetEntityFromNetworkId(netId)
+            while not DoesEntityExist(clonePed) and timeout < 40 do
+                Wait(50)
+                clonePed = NetworkGetEntityFromNetworkId(netId)
+                timeout = timeout + 1
+            end
+
+            if DoesEntityExist(clonePed) then
+                if DoesEntityExist(ownerPed) then
+                    ClonePedToTarget(ownerPed, clonePed)
+                    SetEntityNoCollisionEntity(clonePed, ownerPed, false)
+                end
+                SetEntityNoCollisionEntity(clonePed, myPed, false)
+            end
+        end
+    end)
+end)
+
