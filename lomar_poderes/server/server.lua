@@ -298,3 +298,72 @@ RegisterNetEvent('lumina_poderes:server:syncTimeStop', function(coords)
     local src = source
     TriggerClientEvent('lumina_poderes:client:receiveTimeStop', -1, src, coords, Config.ParadaTemporal.DuracaoMs or 6000)
 end)
+
+-- =========================================================================
+-- NOVOS PODERES DE ALTO IMPACTO VISUAL & AUDÍVEL (LOMAR DEV)
+-- =========================================================================
+
+-- Sincronização de Áudio Espacial / 3D para Todos os Jogadores Próximos
+RegisterNetEvent('lumina_poderes:server:syncSound', function(soundName, coords, maxDist, volume)
+    TriggerClientEvent('lumina_poderes:client:receiveSound', -1, soundName, coords, maxDist or 45.0, volume or 0.7)
+end)
+
+-- Aura Espiritual Contínua
+RegisterNetEvent('lumina_poderes:server:syncAura', function(pedNetId, colorName, active)
+    TriggerClientEvent('lumina_poderes:client:receiveAura', -1, pedNetId, colorName, active)
+end)
+
+RegisterNetEvent('lumina_poderes:server:syncAuraTick', function(pedNetId, colorName)
+    TriggerClientEvent('lumina_poderes:client:receiveAuraTick', -1, pedNetId, colorName)
+end)
+
+-- Chamas Negras / Amaterasu
+RegisterNetEvent('lumina_poderes:server:executeBlackFlames', function(targetId)
+    local src = source
+    targetId = tonumber(targetId)
+    if not targetId or targetId <= 0 or not GetPlayerPing(targetId) or targetId == src then
+        NotifyServer(src, 'Alvo inválido para as Chamas Negras.', 'error')
+        return
+    end
+    TriggerClientEvent('lumina_poderes:client:receiveBlackFlames', targetId, Config.ChamasNegras.DuracaoMs or 8000)
+end)
+
+-- Lança Celestial / Bola de Energia Sagrada
+RegisterNetEvent('lumina_poderes:server:syncLightSpear', function(startX, startY, startZ, dirX, dirY, dirZ)
+    TriggerClientEvent('lumina_poderes:client:receiveLightSpear', -1, startX, startY, startZ, dirX, dirY, dirZ)
+end)
+
+RegisterNetEvent('lumina_poderes:server:syncEnergyBall', function(startX, startY, startZ, targetX, targetY, targetZ)
+    TriggerClientEvent('lumina_poderes:client:receiveEnergyBall', -1, startX, startY, startZ, targetX, targetY, targetZ)
+end)
+
+-- Domo de Proteção Arcana
+RegisterNetEvent('lumina_poderes:server:syncDome', function(coords)
+    local src = source
+    TriggerClientEvent('lumina_poderes:client:receiveDome', -1, src, coords, Config.Domo.DuracaoMs or 12000)
+end)
+
+-- Portal Dimensional (Sincronização dos dois pontos de fenda)
+local activePortals = {}
+
+RegisterNetEvent('lumina_poderes:server:setPortal', function(portalData)
+    local src = source
+    activePortals[src] = portalData
+    TriggerClientEvent('lumina_poderes:client:syncAllPortals', -1, activePortals)
+end)
+
+RegisterNetEvent('lumina_poderes:server:closePortal', function()
+    local src = source
+    if activePortals[src] then
+        activePortals[src] = nil
+        TriggerClientEvent('lumina_poderes:client:syncAllPortals', -1, activePortals)
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    if activePortals[src] then
+        activePortals[src] = nil
+        TriggerClientEvent('lumina_poderes:client:syncAllPortals', -1, activePortals)
+    end
+end)

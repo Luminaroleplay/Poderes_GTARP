@@ -136,9 +136,9 @@ Config.ClonesSombra = {
 
 Config.BuracoNegro = {
     DistanciaMira = 40.0,
-    RaioSugador = 20.0,
-    DuracaoMs = 6000,
-    ForcaExplosao = 1.2
+    RaioSugador = 22.0,
+    DuracaoMs = 7000,
+    ForcaExplosao = 2.0
 }
 
 Config.FormaFantasma = {
@@ -160,4 +160,45 @@ Config.PuxaoSombrio = {
 Config.ParadaTemporal = {
     Raio = 30.0,
     DuracaoMs = 6000
+}
+
+-- Novos Poderes Arrojados & Visuais (LOMAR DEV)
+Config.Aura = {
+    VelocidadeMultiplier = 1.35,
+    DuracaoMs = 60000,
+    PtfxDict = 'scr_powerplay',
+    PtfxName = 'sp_powerplay_beast_appear_trails',
+    SmokeDict = 'scr_ba_bb',
+    SmokeName = 'scr_ba_bb_plane_smoke_trail',
+    Bones = { 51826, 52301, 23553, 24816, 24817, 60309 }
+}
+
+Config.ChamasNegras = {
+    Distancia = 25.0,
+    DuracaoMs = 8000,
+    DanoPorTick = 8,
+    IntervaloTickMs = 1500
+}
+
+Config.LancaLuz = {
+    DistanciaMax = 70.0,
+    Velocidade = 45.0,
+    RaioImpacto = 6.0,
+    Dano = 55
+}
+
+Config.Portal = {
+    DuracaoMs = 120000, -- 2 minutos ativo
+    RaioTeleporte = 1.6
+}
+
+Config.Domo = {
+    Raio = 8.5,
+    DuracaoMs = 12000,
+    ForcaRepulsao = 20.0
+}
+
+Config.OlhoMistico = {
+    Raio = 45.0,
+    DuracaoMs = 25000
 }

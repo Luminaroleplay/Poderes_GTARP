@@ -28,12 +28,42 @@ local function Notify(title, msg, type)
     end
 end
 
+local loadedPtfxDicts = {}
+local function LoadPtfx(dict)
+    if loadedPtfxDicts[dict] then return end
+    if not HasNamedPtfxAssetLoaded(dict) then
+        RequestNamedPtfxAsset(dict)
+        local timeout = 0
+        while not HasNamedPtfxAssetLoaded(dict) and timeout < 200 do
+            Wait(10)
+            timeout = timeout + 1
+        end
+    end
+    loadedPtfxDicts[dict] = true
+end
+
 local function PlaySpellSound(soundName, volume)
     SendNUIMessage({
         sound = soundName,
         volume = volume or 0.4
     })
 end
+
+local function PlaySpellSoundAtCoords(soundName, coords, maxDist, volume)
+    TriggerServerEvent('lumina_poderes:server:syncSound', soundName, coords, maxDist or 45.0, volume or 0.7)
+end
+
+RegisterNetEvent('lumina_poderes:client:receiveSound', function(soundName, coords, maxDist, maxVolume)
+    local pPed = PlayerPedId()
+    local myCoords = GetEntityCoords(pPed)
+    local dist = #(myCoords - coords)
+    local maxDistance = maxDist or 45.0
+    if dist <= maxDistance then
+        local factor = 1.0 - (dist / maxDistance)
+        local vol = math.max(0.05, math.min(1.0, (maxVolume or 0.6) * factor))
+        PlaySpellSound(soundName, vol)
+    end
+end)
 
 local function RequestAnim(animDict)
     if not HasAnimDictLoaded(animDict) then
@@ -1618,11 +1648,11 @@ RegisterCommand('clones', function()
 end, false)
 
 -- =========================================================================
--- 25. BURACO NEGRO / VÓRTICE GRAVITACIONAL (LOMAR DEV)
+-- 25. BURACO NEGRO / VÓRTICE GRAVITACIONAL APRIMORADO (LOMAR DEV)
 -- =========================================================================
 RegisterCommand('buraconegro', function()
     local ped = PlayerPedId()
-    local coords = GetEntityCoords(ped) + (GetEntityForwardVector(ped) * 15.0)
+    local coords = GetEntityCoords(ped) + (GetEntityForwardVector(ped) * 12.0)
 
     RequestAnim("gx_s06@animation")
     if HasAnimDictLoaded("gx_s06@animation") then
@@ -1632,44 +1662,94 @@ RegisterCommand('buraconegro', function()
         TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
     end
 
-    PlaySpellSound("demon", 0.9)
+    PlaySpellSoundAtCoords("escuridao", coords, 55.0, 0.9)
     TriggerServerEvent('lumina_poderes:server:syncBlackHole', coords)
-    Notify('Buraco Negro', 'Você invocou um vórtex de gravidade singular!', 'success')
-    Wait(3000)
+    Notify('Buraco Negro', 'Você invocou um vórtex de matéria escura e gravidade singular!', 'success')
+    Wait(2500)
     ClearPedTasks(ped)
 end, false)
 
 RegisterNetEvent('lumina_poderes:client:receiveBlackHole', function(coords)
     local ped = PlayerPedId()
-    local duration = Config.BuracoNegro.DuracaoMs or 6000
+    local duration = Config.BuracoNegro.DuracaoMs or 7000
     local startTime = GetGameTimer()
 
-    PlaySpellSound("tornado", 0.8)
-    ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 0.8)
+    LoadPtfx("scr_ba_bb")
+    LoadPtfx("scr_powerplay")
+    LoadPtfx("core")
 
+    PlaySpellSoundAtCoords("escuridao", coords, 55.0, 0.95)
+
+    -- Partículas contínuas de fumaça escura abissal e distorção
+    UseParticleFxAssetNextCall("scr_ba_bb")
+    local smokeHandle = StartParticleFxLoopedAtCoord("scr_ba_bb_plane_smoke_trail", coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 4.5, false, false, false, false)
+    SetParticleFxLoopedColour(smokeHandle, 0.0, 0.0, 0.0, false)
+    SetParticleFxLoopedAlpha(smokeHandle, 1.0)
+
+    UseParticleFxAssetNextCall("scr_powerplay")
+    local vortexHandle = StartParticleFxLoopedAtCoord("sp_powerplay_beast_appear_trails", coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 3.5, false, false, false, false)
+    SetParticleFxLoopedColour(vortexHandle, 0.1, 0.0, 0.3, false)
+    SetParticleFxLoopedAlpha(vortexHandle, 1.0)
+
+    -- Thread de renderização visual (Singularidade 3D + Anéis de Acreção em rotação rápida)
+    CreateThread(function()
+        local angle = 0.0
+        while (GetGameTimer() - startTime) < duration do
+            Wait(0)
+            angle = (angle + 3.5) % 360.0
+            local pulse = 2.4 + (math.sin(GetGameTimer() / 150.0) * 0.4)
+
+            -- Singularidade central: esfera sólida preta como o vácuo absoluto
+            DrawMarker(28, coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, pulse, pulse, pulse, 5, 0, 15, 250, false, false, 2, nil, nil, false)
+
+            -- Disco de acreção interior brilhante (roxo cósmico)
+            DrawMarker(25, coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, angle, 5.0, 5.0, 0.4, 140, 0, 255, 200, false, false, 2, nil, nil, false)
+
+            -- Disco de acreção exterior (azul celeste místico com rotação contrária)
+            DrawMarker(25, coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 0.0, 0.0, -angle * 1.5, 7.5, 7.5, 0.3, 30, 120, 255, 160, false, false, 2, nil, nil, false)
+
+            -- Faíscas elétricas de matéria colidindo
+            if math.random(1, 4) == 1 then
+                UseParticleFxAssetNextCall("core")
+                StartParticleFxNonLoopedAtCoord("ent_dst_elec_fire_sp", coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 2.0, false, false, false)
+            end
+        end
+
+        -- Limpa as partículas contínuas
+        StopParticleFxLooped(smokeHandle, false)
+        StopParticleFxLooped(vortexHandle, false)
+
+        -- Colapso Supernova / Vácuo Final
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_flare", coords.x, coords.y, coords.z + 1.2, 0.0, 0.0, 0.0, 3.5, false, false, false)
+        AddExplosion(coords.x, coords.y, coords.z + 1.2, 29, 0.0, true, false, 1.8)
+        PlaySpellSoundAtCoords("thunder", coords, 55.0, 1.0)
+
+        local pCoords = GetEntityCoords(ped)
+        local endDist = #(coords - pCoords)
+        if endDist <= 18.0 then
+            ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.3)
+            AnimpostfxPlay("CamPushInNeutral", 800, false)
+            local shockDir = pCoords - coords
+            local push = 18.0 / math.max(2.0, endDist)
+            ApplyForceToEntity(ped, 1, shockDir.x * push, shockDir.y * push, 3.5, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+            SetPedToRagdoll(ped, 4000, 4000, 0, 0, 0, 0)
+        end
+    end)
+
+    -- Thread de sucção física gravitacional
     CreateThread(function()
         while (GetGameTimer() - startTime) < duration do
-            UseParticleFxAssetNextCall("core")
-            StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", coords.x, coords.y, coords.z, 0.0, 0.0, 0.0, 2.8, false, false, false)
-
             local pCoords = GetEntityCoords(ped)
             local dist = #(coords - pCoords)
 
-            if dist > 1.5 and dist <= (Config.BuracoNegro.RaioSugador or 20.0) then
+            if dist <= (Config.BuracoNegro.RaioSugador or 22.0) and dist > 1.2 then
                 local dir = coords - pCoords
-                local pullForce = 15.0 / math.max(1.0, dist)
-                ApplyForceToEntity(ped, 1, dir.x * pullForce, dir.y * pullForce, dir.z * pullForce + 0.5, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                local pullForce = 22.0 / math.max(1.5, dist)
+                ApplyForceToEntity(ped, 1, dir.x * pullForce, dir.y * pullForce, dir.z * pullForce + 0.6, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.25)
             end
-
-            Wait(150)
-        end
-
-        AddExplosion(coords.x, coords.y, coords.z, 2, 0.0, true, false, 1.0)
-        ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.2)
-        local endCoords = GetEntityCoords(ped)
-        local endDist = #(coords - endCoords)
-        if endDist <= 15.0 then
-            SetPedToRagdoll(ped, 4000, 4000, 0, 0, 0, 0)
+            Wait(100)
         end
     end)
 end)
@@ -1847,4 +1927,723 @@ RegisterNetEvent('lumina_poderes:client:receiveTimeStop', function(casterSrc, co
         end
     end
 end)
+
+-- =========================================================================
+-- 30. AURA SOBRENATURAL / DESPERTAR ESPIRITUAL (LOMAR DEV)
+-- =========================================================================
+local isAuraActive = false
+local currentAuraColor = "dourada"
+local activeAuraParticles = {}
+
+local AuraColors = {
+    ["dourada"]  = { r = 255, g = 215, b = 0,   name = "Dourada (Divina)" },
+    ["amarela"]  = { r = 255, g = 215, b = 0,   name = "Dourada (Divina)" },
+    ["preta"]    = { r = 0,   g = 0,   b = 0,   name = "Preta (Vazio Abissal)" },
+    ["sombra"]   = { r = 0,   g = 0,   b = 0,   name = "Preta (Vazio Abissal)" },
+    ["azul"]     = { r = 0,   g = 160, b = 255, name = "Azul (Celestial)" },
+    ["vermelha"] = { r = 255, g = 20,  b = 20,  name = "Vermelha (Fogo Carmesim)" },
+    ["roxa"]     = { r = 160, g = 32,  b = 240, name = "Roxa (Etérea)" },
+    ["branca"]   = { r = 255, g = 255, b = 255, name = "Branca (Luz Sagrada)" },
+    ["verde"]    = { r = 0,   g = 255, b = 100, name = "Verde (Vital)" }
+}
+
+RegisterCommand('aura', function(source, args)
+    local ped = PlayerPedId()
+    local colorArg = args[1] and string.lower(args[1]) or nil
+
+    if isAuraActive and (not colorArg or colorArg == currentAuraColor) then
+        isAuraActive = false
+        ClearTimecycleModifier()
+        Notify('Aura Sobrenatural', 'Você recolheu sua aura espiritual.', 'inform')
+        return
+    end
+
+    if colorArg and AuraColors[colorArg] then
+        currentAuraColor = colorArg
+    elseif not isAuraActive then
+        currentAuraColor = "dourada"
+    end
+
+    local colorData = AuraColors[currentAuraColor] or AuraColors["dourada"]
+    isAuraActive = true
+
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 1500, 49, 0, false, false, false)
+    PlaySpellSoundAtCoords("lux", GetEntityCoords(ped), 40.0, 0.9)
+    AnimpostfxPlay("DeadlineNeon", 2000, false)
+
+    Notify('Aura Sobrenatural', ('Aura %s DESPERTADA! Velocidade e poder ampliados!'):format(colorData.name), 'success')
+
+    -- Thread de renderização contínua das partículas no próprio jogador
+    CreateThread(function()
+        LoadPtfx("scr_powerplay")
+        LoadPtfx("scr_ba_bb")
+        LoadPtfx("core")
+
+        local bones = { 51826, 24816, 18905, 57005, 52301, 14201, 31086 }
+        local lastBroadcast = 0
+        local ringAngle = 0.0
+
+        while isAuraActive do
+            local currentPed = PlayerPedId()
+            local pCoords = GetEntityCoords(currentPed)
+            local cfgColor = AuraColors[currentAuraColor] or AuraColors["dourada"]
+            local r = cfgColor.r / 255.0
+            local g = cfgColor.g / 255.0
+            local b = cfgColor.b / 255.0
+
+            -- Partículas de energia viva nos ossos principais do corpo
+            for _, boneId in ipairs(bones) do
+                local bIdx = GetPedBoneIndex(currentPed, boneId)
+                if bIdx ~= -1 then
+                    UseParticleFxAssetNextCall("scr_powerplay")
+                    SetParticleFxNonLoopedColour(r, g, b)
+                    SetParticleFxNonLoopedAlpha(1.0)
+                    StartNetworkedParticleFxNonLoopedOnPedBone("sp_powerplay_beast_appear_trails", currentPed, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bIdx, 3.5, false, false, false)
+                end
+            end
+
+            -- Se for aura de sombra / preta, adiciona fumaça densa do mri_escuridao
+            if currentAuraColor == "preta" or currentAuraColor == "sombra" then
+                local bIdx = GetPedBoneIndex(currentPed, 51826)
+                UseParticleFxAssetNextCall("scr_ba_bb")
+                SetParticleFxNonLoopedColour(0.0, 0.0, 0.0)
+                SetParticleFxNonLoopedAlpha(1.0)
+                StartNetworkedParticleFxNonLoopedOnPedBone("scr_ba_bb_plane_smoke_trail", currentPed, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bIdx, 5.0, false, false, false)
+            end
+
+            -- Faíscas elétricas de poder nas mãos e peito
+            local chestIdx = GetPedBoneIndex(currentPed, 24816)
+            if chestIdx ~= -1 then
+                UseParticleFxAssetNextCall("core")
+                StartNetworkedParticleFxNonLoopedOnPedBone("ent_dst_elec_fire_sp", currentPed, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, chestIdx, 1.8, false, false, false)
+            end
+
+            -- Broadcast para outros jogadores no servidor a cada 250ms
+            if (GetGameTimer() - lastBroadcast) > 250 then
+                lastBroadcast = GetGameTimer()
+                local netId = NetworkGetNetworkIdFromEntity(currentPed)
+                if netId > 0 then
+                    TriggerServerEvent('lumina_poderes:server:syncAuraTick', netId, currentAuraColor)
+                end
+            end
+
+            -- Buffs: super velocidade de corrida e stamina restaurada
+            SetPedMoveRateOverride(currentPed, Config.Aura.VelocidadeMultiplier or 1.35)
+            RestorePlayerStamina(PlayerId(), 1.0)
+
+            Wait(180)
+        end
+
+        SetPedMoveRateOverride(PlayerPedId(), 1.0)
+    end)
+
+    -- Thread de efeitos sob os pés (anel mágico no solo que segue o jogador)
+    CreateThread(function()
+        local angle = 0.0
+        while isAuraActive do
+            Wait(0)
+            angle = (angle + 3.0) % 360.0
+            local currentPed = PlayerPedId()
+            local pCoords = GetEntityCoords(currentPed)
+            local cfgColor = AuraColors[currentAuraColor] or AuraColors["dourada"]
+
+            DrawMarker(25, pCoords.x, pCoords.y, pCoords.z - 0.95, 0.0, 0.0, 0.0, 0.0, 0.0, angle, 1.8, 1.8, 0.2, cfgColor.r, cfgColor.g, cfgColor.b, 170, false, false, 2, nil, nil, false)
+        end
+    end)
+end, false)
+
+RegisterCommand('despertar', function(source, args)
+    ExecuteCommand('aura ' .. (args[1] or 'dourada'))
+end, false)
+
+-- Recebe partículas de aura de outros jogadores
+RegisterNetEvent('lumina_poderes:client:receiveAuraTick', function(pedNetId, colorName)
+    if not NetworkDoesNetworkIdExist(pedNetId) then return end
+    local targetPed = NetworkGetEntityFromNetworkId(pedNetId)
+    if not targetPed or not DoesEntityExist(targetPed) or targetPed == PlayerPedId() then return end
+
+    local colorData = AuraColors[colorName] or AuraColors["dourada"]
+    local r = colorData.r / 255.0
+    local g = colorData.g / 255.0
+    local b = colorData.b / 255.0
+
+    LoadPtfx("scr_powerplay")
+    LoadPtfx("core")
+
+    local bones = { 51826, 24816, 18905, 57005, 52301, 14201 }
+    for _, boneId in ipairs(bones) do
+        local bIdx = GetPedBoneIndex(targetPed, boneId)
+        if bIdx ~= -1 then
+            UseParticleFxAssetNextCall("scr_powerplay")
+            SetParticleFxNonLoopedColour(r, g, b)
+            SetParticleFxNonLoopedAlpha(1.0)
+            StartNetworkedParticleFxNonLoopedOnPedBone("sp_powerplay_beast_appear_trails", targetPed, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bIdx, 3.5, false, false, false)
+        end
+    end
+
+    if colorName == "preta" or colorName == "sombra" then
+        LoadPtfx("scr_ba_bb")
+        local bIdx = GetPedBoneIndex(targetPed, 51826)
+        UseParticleFxAssetNextCall("scr_ba_bb")
+        SetParticleFxNonLoopedColour(0.0, 0.0, 0.0)
+        SetParticleFxNonLoopedAlpha(1.0)
+        StartNetworkedParticleFxNonLoopedOnPedBone("scr_ba_bb_plane_smoke_trail", targetPed, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, bIdx, 5.0, false, false, false)
+    end
+end)
+
+-- =========================================================================
+-- 31. CHAMAS NEGRAS / AMATERASU (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('chamasnegras', function(source, args)
+    local targetId = tonumber(args[1])
+    if not targetId or targetId <= 0 then
+        local closest, dist = GetClosestPlayer()
+        if closest ~= -1 and dist <= (Config.ChamasNegras.Distancia or 25.0) then
+            targetId = GetPlayerServerId(closest)
+        else
+            Notify('Chamas Negras', 'Uso: /chamasnegras [ID] ou aproxime-se de um jogador.', 'error')
+            return
+        end
+    end
+
+    local ped = PlayerPedId()
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 2000, 49, 0, false, false, false)
+    PlaySpellSoundAtCoords("demon", GetEntityCoords(ped), 40.0, 0.9)
+    AnimpostfxPlay("REDMIST", 1500, false)
+
+    TriggerServerEvent('lumina_poderes:server:executeBlackFlames', targetId)
+    Notify('Chamas Negras', 'Você lançou as Chamas Negras que consomem a alma do alvo!', 'success')
+    Wait(2000)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('amaterasu', function(source, args)
+    ExecuteCommand('chamasnegras ' .. (args[1] or ''))
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveBlackFlames', function(duration)
+    local ped = PlayerPedId()
+    duration = duration or 8000
+    local startTime = GetGameTimer()
+
+    LoadPtfx("scr_ba_bb")
+    LoadPtfx("core")
+
+    PlaySpellSoundAtCoords("flame", GetEntityCoords(ped), 40.0, 0.95)
+    SetTimecycleModifier("rply_vignette")
+
+    local particles = {}
+    local bones = { 51826, 24816, 24817, 31086 }
+    for _, boneId in ipairs(bones) do
+        UseParticleFxAssetNextCall("scr_ba_bb")
+        local handle = StartParticleFxLoopedOnEntityBone("scr_ba_bb_plane_smoke_trail", ped, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, boneId, 1.8, false, false, false)
+        SetParticleFxLoopedColour(handle, 0.0, 0.0, 0.0, false)
+        SetParticleFxLoopedAlpha(handle, 1.0)
+        table.insert(particles, handle)
+    end
+
+    Notify('Chamas Negras', 'VOCÊ ESTÁ QUEIMANDO EM CHAMAS NEGRAS MALDITAS!', 'error')
+
+    CreateThread(function()
+        local nextTick = GetGameTimer()
+        while (GetGameTimer() - startTime) < duration do
+            Wait(100)
+            if math.random(1, 3) == 1 then
+                UseParticleFxAssetNextCall("core")
+                StartParticleFxNonLoopedOnPedBone("ent_dst_elec_fire_sp", ped, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 24816, 1.5, false, false, false)
+            end
+
+            if GetGameTimer() >= nextTick then
+                nextTick = GetGameTimer() + (Config.ChamasNegras.IntervaloTickMs or 1500)
+                ApplyDamageToPed(ped, Config.ChamasNegras.DanoPorTick or 8, false)
+                ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.2)
+            end
+        end
+
+        for _, handle in ipairs(particles) do
+            StopParticleFxLooped(handle, false)
+        end
+        ClearTimecycleModifier()
+        Notify('Chamas Negras', 'As chamas negras finalmente se dissiparam.', 'inform')
+    end)
+end)
+
+-- =========================================================================
+-- 32. LANÇA / BOLA DE ENERGIA SAGRADA (LOMAR DEV)
+-- Mira com [E], animação de fogo mágico e dano massivo em todas as entidades!
+-- =========================================================================
+local isAimingEnergyBall = false
+
+RegisterCommand('lanca', function()
+    if isAimingEnergyBall then return end
+    isAimingEnergyBall = true
+
+    local ped = PlayerPedId()
+    local dict = "rcmbarry"
+    local anim = "bar_1_attack_idle_aln"
+
+    RequestAnim(dict)
+    TaskPlayAnim(ped, dict, anim, 1.0, 1.0, -1, 49, 0.0, false, false, false)
+
+    PlaySpellSoundAtCoords("lux", GetEntityCoords(ped), 30.0, 0.7)
+    Notify('Bola de Energia', 'Mire e pressione [E] ou [CLICK ESQUERDO] para disparar! [ESC] para cancelar.', 'inform')
+
+    CreateThread(function()
+        local maxDist = 120.0
+        local chosenHit = nil
+
+        while isAimingEnergyBall do
+            Wait(0)
+            local currentPed = PlayerPedId()
+            local camCoords = GetGameplayCamCoord()
+            local farCoords = GetCoordsFromCam(maxDist, camCoords)
+
+            local ray = StartExpensiveSynchronousShapeTestLosProbe(camCoords.x, camCoords.y, camCoords.z, farCoords.x, farCoords.y, farCoords.z, -1, currentPed, 7)
+            local _, hit, endCoords = GetShapeTestResult(ray)
+
+            if hit and endCoords then
+                chosenHit = endCoords
+                -- Marcador 3D de mira no alvo exato (esfera e anel de impacto)
+                DrawMarker(28, endCoords.x, endCoords.y, endCoords.z + 0.25, 0, 0, 0, 0, 0, 0, 0.6, 0.6, 0.6, 255, 220, 50, 220, false, false, 2, nil, nil, false)
+                DrawMarker(1, endCoords.x, endCoords.y, endCoords.z - 0.3, 0, 0, 0, 0, 0, 0, 1.8, 1.8, 0.3, 255, 200, 0, 180, false, false, 2, nil, nil, false)
+            else
+                chosenHit = farCoords
+            end
+
+            -- Pequena bola de energia viva concentrando na mão direita do personagem
+            local handPos = GetPedBoneCoords(currentPed, 60309, 0.0, 0.0, 0.0)
+            DrawMarker(28, handPos.x, handPos.y, handPos.z + 0.05, 0, 0, 0, 0, 0, 0, 0.35, 0.35, 0.35, 255, 230, 80, 240, false, false, 2, nil, nil, false)
+
+            -- Disparo com [E] (38), [ENTER] (191) ou [CLICK ESQUERDO] (24)
+            if IsControlJustReleased(0, 38) or IsControlJustReleased(0, 191) or IsControlJustReleased(0, 24) then
+                isAimingEnergyBall = false
+
+                if chosenHit then
+                    -- Vira o ped em direção ao alvo
+                    TaskTurnPedToFaceCoord(currentPed, chosenHit.x, chosenHit.y, chosenHit.z, 300)
+
+                    -- Animação explosiva de arremesso para frente
+                    RequestAnim("weapons@projectile@grenade_str")
+                    TaskPlayAnim(currentPed, "weapons@projectile@grenade_str", "throw_m_fb", 8.0, -8.0, 700, 49, 0.0, false, false, false)
+                    Wait(150)
+
+                    -- Ponto inicial elevado (sai da altura do peito/ombro para NUNCA raspar no chão!)
+                    local startPos = GetPedBoneCoords(currentPed, 60309, 0.0, 0.0, 0.0) + vector3(0.0, 0.0, 0.35)
+
+                    -- Sincroniza o disparo pelo ar com todos os jogadores
+                    TriggerServerEvent('lumina_poderes:server:syncEnergyBall', startPos.x, startPos.y, startPos.z, chosenHit.x, chosenHit.y, chosenHit.z)
+                    PlaySpellSoundAtCoords("lux", startPos, 45.0, 0.9)
+
+                    Wait(500)
+                    ClearPedTasks(currentPed)
+                end
+                break
+            -- Cancelamento com [ESC] (177) ou [BACKSPACE] (73)
+            elseif IsControlJustReleased(0, 177) or IsControlJustReleased(0, 73) then
+                isAimingEnergyBall = false
+                ClearPedTasks(currentPed)
+                Notify('Bola de Energia', 'Disparo cancelado.', 'error')
+                break
+            end
+        end
+    end)
+end, false)
+
+RegisterCommand('lancadeluz', function()
+    ExecuteCommand('lanca')
+end, false)
+
+RegisterCommand('boladeenergia', function()
+    ExecuteCommand('lanca')
+end, false)
+
+-- Trajetória pelo ar e Detonação com DANO TOTAL em todas as entidades
+RegisterNetEvent('lumina_poderes:client:receiveEnergyBall', function(startX, startY, startZ, targetX, targetY, targetZ)
+    local startPos = vector3(startX, startY, startZ)
+    local targetPos = vector3(targetX, targetY, targetZ)
+    local totalDist = #(targetPos - startPos)
+    if totalDist < 0.5 then return end
+
+    local dir = (targetPos - startPos) / totalDist
+    local speed = 55.0 -- 55 metros por segundo
+    local travelTime = (totalDist / speed) * 1000.0 -- milissegundos
+    local startTime = GetGameTimer()
+
+    LoadPtfx("scr_powerplay")
+    LoadPtfx("core")
+
+    CreateThread(function()
+        local currentPos = startPos
+        local angle = 0.0
+
+        while (GetGameTimer() - startTime) < travelTime do
+            Wait(16)
+            local elapsed = GetGameTimer() - startTime
+            local progress = math.min(1.0, elapsed / travelTime)
+            currentPos = startPos + (dir * (totalDist * progress))
+            angle = (angle + 12.0) % 360.0
+
+            -- Bola de Energia 3D Gigante e Radiante
+            DrawMarker(28, currentPos.x, currentPos.y, currentPos.z, 0, 0, 0, 0, 0, 0, 0.95, 0.95, 0.95, 255, 235, 90, 250, false, false, 2, nil, nil, false)
+            -- Anel cósmico girando ao redor da esfera
+            DrawMarker(25, currentPos.x, currentPos.y, currentPos.z, 0, 0, 0, 0, 0, angle, 1.8, 1.8, 0.25, 255, 180, 40, 200, false, false, 2, nil, nil, false)
+
+            -- Rastro de feixe contínuo de energia
+            UseParticleFxAssetNextCall("scr_powerplay")
+            StartParticleFxNonLoopedAtCoord("sp_powerplay_beast_appear_trails", currentPos.x, currentPos.y, currentPos.z, 0.0, 0.0, 0.0, 1.8, false, false, false)
+        end
+
+        -- =========================================================================
+        -- IMPACTO EXPLOSIVO & DESTRUIÇÃO DE TODAS AS ENTIDADES
+        -- =========================================================================
+        local hitCoords = targetPos
+
+        -- Áudio estrondoso de trovão e impacto místico
+        PlaySpellSoundAtCoords("thunder", hitCoords, 65.0, 1.0)
+        PlaySpellSoundAtCoords("lux", hitCoords, 60.0, 0.9)
+
+        -- Explosão real que destrói cenário, quebra vidros e causa dano
+        AddExplosion(hitCoords.x, hitCoords.y, hitCoords.z + 0.3, 2, 100.0, true, false, 2.5)
+        AddExplosion(hitCoords.x, hitCoords.y, hitCoords.z + 0.5, 9, 80.0, true, false, 2.0)
+
+        -- Partículas visuais de supernova sagrada
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxNonLoopedAtCoord("exp_grd_flare", hitCoords.x, hitCoords.y, hitCoords.z + 0.5, 0.0, 0.0, 0.0, 3.5, false, false, false)
+        UseParticleFxAssetNextCall("scr_powerplay")
+        StartParticleFxNonLoopedAtCoord("sp_powerplay_beast_appear_trails", hitCoords.x, hitCoords.y, hitCoords.z + 0.5, 0.0, 0.0, 0.0, 4.0, false, false, false)
+
+        -- Tremor e flash de câmera para quem estiver perto
+        local myPed = PlayerPedId()
+        local myCoords = GetEntityCoords(myPed)
+        local myDist = #(hitCoords - myCoords)
+        if myDist <= 40.0 then
+            ShakeGameplayCam('LARGE_EXPLOSION_SHAKE', 1.4)
+            AnimpostfxPlay("CamPushInNeutral", 700, false)
+        end
+
+        -- Onda de choque de luz se expandindo no solo
+        CreateThread(function()
+            local ringRadius = 0.5
+            while ringRadius < 8.0 do
+                Wait(0)
+                ringRadius = ringRadius + 0.4
+                local alpha = math.floor(240 * (1.0 - (ringRadius / 8.0)))
+                DrawMarker(1, hitCoords.x, hitCoords.y, hitCoords.z - 0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, ringRadius * 2.0, ringRadius * 2.0, 0.4, 255, 230, 80, alpha, false, false, 2, nil, nil, false)
+            end
+        end)
+
+        -- 1. DESTRUIÇÃO TOTAL DE VEÍCULOS NO RAIO (CARROS, MOTOS, CAMINHÕES)
+        for _, veh in ipairs(GetGamePool('CVehicle')) do
+            if DoesEntityExist(veh) then
+                local vCoords = GetEntityCoords(veh)
+                local vDist = #(hitCoords - vCoords)
+
+                if vDist <= 14.0 then
+                    -- Se for impacto direto (< 5.0m), o carro explode na hora!
+                    if vDist <= 5.0 then
+                        SetVehicleEngineHealth(veh, -4000.0)
+                        ExplodeVehicle(veh, true, false)
+                    else
+                        -- Se for até 14 metros, destrói o motor e lataria
+                        SetVehicleEngineHealth(veh, 0.0)
+                        SetVehicleBodyHealth(veh, 0.0)
+                        SetVehicleUndriveable(veh, true)
+                    end
+
+                    -- Força física violenta arremessando o veículo para o alto e para longe
+                    local pushDir = vCoords - hitCoords
+                    local len = #(pushDir)
+                    local pushX = len > 0.01 and (pushDir.x / len) or 1.0
+                    local pushY = len > 0.01 and (pushDir.y / len) or 0.0
+                    ApplyForceToEntity(veh, 1, pushX * 45.0, pushY * 45.0, 16.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                end
+            end
+        end
+
+        -- 2. DANO BRUTAL E RAGDOLL EM TODOS OS PEDS E JOGADORES NO RAIO
+        for _, p in ipairs(GetGamePool('CPed')) do
+            if DoesEntityExist(p) and p ~= myPed then
+                local pCoords = GetEntityCoords(p)
+                local pDist = #(hitCoords - pCoords)
+
+                if pDist <= 14.0 then
+                    ApplyDamageToPed(p, 180, false)
+                    SetPedToRagdoll(p, 6000, 6000, 0, 0, 0, 0)
+
+                    local pushDir = pCoords - hitCoords
+                    local len = #(pushDir)
+                    local pushX = len > 0.01 and (pushDir.x / len) or 1.0
+                    local pushY = len > 0.01 and (pushDir.y / len) or 0.0
+                    ApplyForceToEntity(p, 1, pushX * 32.0, pushY * 32.0, 14.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                end
+            end
+        end
+
+        -- 3. FORÇA FÍSICA EM PROPS E OBJETOS DO CENÁRIO (CObject)
+        for _, obj in ipairs(GetGamePool('CObject')) do
+            if DoesEntityExist(obj) then
+                local oCoords = GetEntityCoords(obj)
+                local oDist = #(hitCoords - oCoords)
+
+                if oDist <= 12.0 then
+                    local pushDir = oCoords - hitCoords
+                    local len = #(pushDir)
+                    local pushX = len > 0.01 and (pushDir.x / len) or 1.0
+                    local pushY = len > 0.01 and (pushDir.y / len) or 0.0
+                    ApplyForceToEntity(obj, 1, pushX * 28.0, pushY * 28.0, 12.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                end
+            end
+        end
+    end)
+end)
+
+-- =========================================================================
+-- 33. PORTAL DIMENSIONAL (LOMAR DEV)
+-- =========================================================================
+local myPortalState = nil
+local allActivePortals = {}
+local lastTeleportTime = 0
+
+RegisterCommand('portal', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    if not myPortalState or not myPortalState.alfa then
+        myPortalState = {
+            alfa = coords,
+            beta = nil,
+            endTime = GetGameTimer() + (Config.Portal.DuracaoMs or 120000)
+        }
+        TriggerServerEvent('lumina_poderes:server:setPortal', myPortalState)
+        PlaySpellSoundAtCoords("lux", coords, 35.0, 0.8)
+        Notify('Portal Dimensional', 'Portal Alfa (Entrada) fincado! Use /portal em outro local para abrir a Saída!', 'success')
+    elseif myPortalState.alfa and not myPortalState.beta then
+        myPortalState.beta = coords
+        myPortalState.endTime = GetGameTimer() + (Config.Portal.DuracaoMs or 120000)
+        TriggerServerEvent('lumina_poderes:server:setPortal', myPortalState)
+        PlaySpellSoundAtCoords("lux", coords, 35.0, 0.8)
+        Notify('Portal Dimensional', 'Fenda Aberta! Os portais Alfa e Beta estão conectados!', 'success')
+    else
+        myPortalState = {
+            alfa = coords,
+            beta = nil,
+            endTime = GetGameTimer() + (Config.Portal.DuracaoMs or 120000)
+        }
+        TriggerServerEvent('lumina_poderes:server:setPortal', myPortalState)
+        PlaySpellSoundAtCoords("lux", coords, 35.0, 0.8)
+        Notify('Portal Dimensional', 'Novo Portal Alfa fincado! Use /portal no destino.', 'inform')
+    end
+end, false)
+
+RegisterCommand('fecharportal', function()
+    if myPortalState then
+        myPortalState = nil
+        TriggerServerEvent('lumina_poderes:server:closePortal')
+        Notify('Portal Dimensional', 'Seus portais foram fechados e dissipados.', 'inform')
+    else
+        Notify('Portal Dimensional', 'Você não possui nenhum portal aberto.', 'error')
+    end
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:syncAllPortals', function(portalsList)
+    allActivePortals = portalsList or {}
+end)
+
+CreateThread(function()
+    LoadPtfx("scr_powerplay")
+    local angle = 0.0
+
+    while true do
+        local hasPortals = false
+        for _, pData in pairs(allActivePortals) do
+            if pData and pData.alfa then
+                hasPortals = true
+                break
+            end
+        end
+
+        if hasPortals then
+            angle = (angle + 2.5) % 360.0
+            local ped = PlayerPedId()
+            local pCoords = GetEntityCoords(ped)
+
+            for srcId, pData in pairs(allActivePortals) do
+                if pData.alfa then
+                    local a = pData.alfa
+                    DrawMarker(25, a.x, a.y, a.z - 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, angle, 2.5, 2.5, 0.3, 0, 160, 255, 200, false, false, 2, nil, nil, false)
+                    DrawMarker(1, a.x, a.y, a.z - 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.5, 2.5, 2.5, 0, 100, 255, 60, false, false, 2, nil, nil, false)
+
+                    if pData.beta and (GetGameTimer() - lastTeleportTime > 3500) then
+                        local distA = #(pCoords - a)
+                        if distA <= (Config.Portal.RaioTeleporte or 1.6) then
+                            lastTeleportTime = GetGameTimer()
+                            PlaySpellSoundAtCoords("escuridao", a, 30.0, 0.8)
+                            AnimpostfxPlay("CamPushInNeutral", 600, false)
+                            SetEntityCoords(ped, pData.beta.x, pData.beta.y, pData.beta.z + 0.2, false, false, false, false)
+                            PlaySpellSoundAtCoords("lux", pData.beta, 30.0, 0.8)
+                            Notify('Portal Dimensional', 'Você atravessou o Portal Alfa para Beta!', 'success')
+                        end
+                    end
+                end
+
+                if pData.beta then
+                    local b = pData.beta
+                    DrawMarker(25, b.x, b.y, b.z - 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, -angle, 2.5, 2.5, 0.3, 200, 40, 255, 200, false, false, 2, nil, nil, false)
+                    DrawMarker(1, b.x, b.y, b.z - 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.5, 2.5, 2.5, 180, 0, 255, 60, false, false, 2, nil, nil, false)
+
+                    if pData.alfa and (GetGameTimer() - lastTeleportTime > 3500) then
+                        local distB = #(pCoords - b)
+                        if distB <= (Config.Portal.RaioTeleporte or 1.6) then
+                            lastTeleportTime = GetGameTimer()
+                            PlaySpellSoundAtCoords("escuridao", b, 30.0, 0.8)
+                            AnimpostfxPlay("CamPushInNeutral", 600, false)
+                            SetEntityCoords(ped, pData.alfa.x, pData.alfa.y, pData.alfa.z + 0.2, false, false, false, false)
+                            PlaySpellSoundAtCoords("lux", pData.alfa, 30.0, 0.8)
+                            Notify('Portal Dimensional', 'Você atravessou o Portal Beta para Alfa!', 'success')
+                        end
+                    end
+                end
+            end
+            Wait(0)
+        else
+            Wait(500)
+        end
+    end
+end)
+
+-- =========================================================================
+-- 34. DOMO DE PROTEÇÃO ARCANA (LOMAR DEV)
+-- =========================================================================
+RegisterCommand('domo', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+
+    RequestAnim("rcmbarry")
+    TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 1500, 49, 0, false, false, false)
+
+    PlaySpellSoundAtCoords("earthquake", coords, 45.0, 0.9)
+    TriggerServerEvent('lumina_poderes:server:syncDome', coords)
+    Notify('Domo de Proteção', 'Você ergueu uma barreira impenetrável de energia arcana!', 'success')
+    Wait(1500)
+    ClearPedTasks(ped)
+end, false)
+
+RegisterCommand('barreira', function()
+    ExecuteCommand('domo')
+end, false)
+
+RegisterNetEvent('lumina_poderes:client:receiveDome', function(casterSrc, coords, duration)
+    duration = duration or 12000
+    local startTime = GetGameTimer()
+    local domeRadius = Config.Domo.Raio or 8.5
+    local isCaster = (GetPlayerServerId(PlayerId()) == tonumber(casterSrc))
+
+    LoadPtfx("scr_powerplay")
+
+    CreateThread(function()
+        local angle = 0.0
+        while (GetGameTimer() - startTime) < duration do
+            Wait(0)
+            angle = (angle + 1.5) % 360.0
+
+            DrawMarker(1, coords.x, coords.y, coords.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, domeRadius * 2.0, domeRadius * 2.0, 4.5, 0, 180, 255, 90, false, false, 2, nil, nil, false)
+            DrawMarker(25, coords.x, coords.y, coords.z - 0.9, 0.0, 0.0, 0.0, 0.0, 0.0, angle, domeRadius * 2.0, domeRadius * 2.0, 0.3, 100, 220, 255, 180, false, false, 2, nil, nil, false)
+
+            if not isCaster then
+                local ped = PlayerPedId()
+                local pCoords = GetEntityCoords(ped)
+                local dist = #(coords - pCoords)
+
+                if dist < domeRadius then
+                    local pushDir = pCoords - coords
+                    local len = #(pushDir)
+                    local pushX = len > 0.001 and (pushDir.x / len) or 1.0
+                    local pushY = len > 0.001 and (pushDir.y / len) or 0.0
+                    ApplyForceToEntity(ped, 1, pushX * (Config.Domo.ForcaRepulsao or 20.0), pushY * (Config.Domo.ForcaRepulsao or 20.0), 3.0, 0.0, 0.0, 0.0, 0, false, true, true, false, true)
+                    ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.2)
+                    Notify('Barreira Arcana', 'O domo místico te repeliu para fora!', 'error')
+                end
+            end
+        end
+
+        PlaySpellSoundAtCoords("lux", coords, 40.0, 0.6)
+    end)
+end)
+
+-- =========================================================================
+-- 35. OLHO MÍSTICO / VISÃO ESPIRITUAL (LOMAR DEV)
+-- =========================================================================
+local isMysticEyeActive = false
+
+local function DrawText3DMystic(coords, text, color)
+    local onScreen, _x, _y = World3dToScreen2d(coords.x, coords.y, coords.z)
+    if onScreen then
+        SetTextScale(0.35, 0.35)
+        SetTextFont(4)
+        SetTextProportional(1)
+        SetTextColour(color.r, color.g, color.b, color.a or 255)
+        SetTextDropshadow(0, 0, 0, 0, 255)
+        SetTextEdge(2, 0, 0, 0, 150)
+        SetTextDropShadow()
+        SetTextOutline()
+        SetTextEntry("STRING")
+        SetTextCentre(1)
+        AddTextComponentString(text)
+        DrawText(_x, _y)
+    end
+end
+
+RegisterCommand('olhomistico', function()
+    isMysticEyeActive = not isMysticEyeActive
+    local ped = PlayerPedId()
+
+    if isMysticEyeActive then
+        PlaySpellSound("lux", 0.8)
+        SetTimecycleModifier("REDMIST")
+        SetTimecycleModifierStrength(0.4)
+        AnimpostfxPlay("SwitchSceneMichael", 1000, false)
+        Notify('Olho Místico', 'Visão Espiritual ATIVADA! Sentindo a essência vital de todos ao redor.', 'success')
+
+        CreateThread(function()
+            local startTime = GetGameTimer()
+            local maxDuration = Config.OlhoMistico.DuracaoMs or 25000
+
+            while isMysticEyeActive and (GetGameTimer() - startTime < maxDuration) do
+                Wait(0)
+                local pCoords = GetEntityCoords(ped)
+
+                for _, playerId in ipairs(GetActivePlayers()) do
+                    if playerId ~= PlayerId() then
+                        local tPed = GetPlayerPed(playerId)
+                        if DoesEntityExist(tPed) then
+                            local tCoords = GetEntityCoords(tPed)
+                            local dist = #(pCoords - tCoords)
+
+                            if dist <= (Config.OlhoMistico.Raio or 45.0) then
+                                local hp = math.max(0, GetEntityHealth(tPed) - 100)
+                                local maxHp = math.max(1, GetEntityMaxHealth(tPed) - 100)
+                                local sId = GetPlayerServerId(playerId)
+                                local label = ("~b~[ID: %d]~w~ Alma: ~g~%d/%d HP"):format(sId, hp, maxHp)
+
+                                DrawText3DMystic(vector3(tCoords.x, tCoords.y, tCoords.z + 1.1), label, { r = 255, g = 255, b = 255, a = 240 })
+                                DrawLine(pCoords.x, pCoords.y, pCoords.z, tCoords.x, tCoords.y, tCoords.z, 0, 180, 255, 120)
+                            end
+                        end
+                    end
+                end
+            end
+
+            if isMysticEyeActive then
+                isMysticEyeActive = false
+                ClearTimecycleModifier()
+                Notify('Olho Místico', 'A visão espiritual se fechou.', 'inform')
+            end
+        end)
+    else
+        ClearTimecycleModifier()
+        Notify('Olho Místico', 'Visão Espiritual DESATIVADA.', 'inform')
+    end
+end, false)
 
