@@ -51,8 +51,8 @@ Config.Lobisomem = {
     SpeedMultiplier = 1.49,              -- Arrancada veloz de fera
     MeleeDamageMultiplier = 2.5,         -- Dano brutal das garras
     PuloPoderoso = true,                 -- Super salto de fera
-    AudioTransformation = 'demon',       -- Efeito sonoro místico
-    AudioHowl = 'demon',                 -- Som do uivo da fera
+    AudioTransformation = 'earthquake',  -- Efeito sonoro real de impacto
+    AudioHowl = 'tornado',               -- Som do rugido do vento feral
     PtfxAsset = 'core',                  -- Partícula de fumaça mística
     PtfxParticle = 'exp_grd_grenade_smoke'
 }
@@ -62,7 +62,7 @@ Config.LoboSirius = {
     Model = 'LoboSirius',                -- Modelo animal de 4 patas (Lobo_Sirius_Lumina)
     MaxHealth = 300,
     SpeedMultiplier = 1.60,              -- Agilidade extrema
-    AudioTransformation = 'demon'
+    AudioTransformation = 'earthquake'
 }
 
 -- Novos Poderes Sobrenaturais (LOMAR DEV)

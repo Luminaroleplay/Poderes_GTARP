@@ -4,11 +4,22 @@
     <meta charset="UTF-8">
     <title>Lumina Poderes</title>
     <script type="text/javascript">
+        var SFX_MAP = {
+            'angel': 'tornado.ogg',
+            'demon': 'earthquake.mp3',
+            'escuridao': 'tornado.ogg',
+            'eu_sou_a_tempestade': 'thunder.ogg',
+            'lux': 'tornado.ogg',
+            'mental': 'thunder.ogg',
+            'risada': 'earthquake.mp3',
+            'tempestade_surja': 'thunder.ogg'
+        };
+
         window.addEventListener("message", function(event) {
             var item = event.data;
             if (item && item.sound) {
-                var soundFile = item.sound;
-                // Se já não tiver extensão, define .ogg como padrão
+                var raw = String(item.sound).replace(/\.ogg$|\.mp3$/i, '');
+                var soundFile = SFX_MAP[raw] || item.sound;
                 if (!soundFile.endsWith('.ogg') && !soundFile.endsWith('.mp3')) {
                     soundFile += '.ogg';
                 }

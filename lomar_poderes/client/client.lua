@@ -42,9 +42,23 @@ local function LoadPtfx(dict)
     loadedPtfxDicts[dict] = true
 end
 
+local SFX_AUDIO_SANITIZER = {
+    ['angel'] = 'tornado',
+    ['demon'] = 'earthquake',
+    ['escuridao'] = 'tornado',
+    ['eu_sou_a_tempestade'] = 'thunder',
+    ['lux'] = 'tornado',
+    ['mental'] = 'thunder',
+    ['risada'] = 'earthquake',
+    ['tempestade_surja'] = 'thunder'
+}
+
 local function PlaySpellSound(soundName, volume)
+    if not soundName then return end
+    local cleanName = tostring(soundName):gsub("%.ogg$", ""):gsub("%.mp3$", "")
+    local sanitized = SFX_AUDIO_SANITIZER[cleanName] or cleanName
     SendNUIMessage({
-        sound = soundName,
+        sound = sanitized,
         volume = volume or 0.4
     })
 end
@@ -170,7 +184,8 @@ local function ToggleLevitacao()
 
     levitando = true
     local coords = GetEntityCoords(ped)
-    PlaySpellSound("lux", 0.4)
+    PlaySpellSound("tornado", 0.35)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     Notify('Levitação', 'Levitando! Pressione [E] ou digite /levitar para cancelar.', 'success')
 
     RequestAnim(dict)
@@ -373,7 +388,8 @@ RegisterNetEvent('lumina_poderes:client:playBiteVampire', function()
 
     RequestAnim(dict)
     FreezeEntityPosition(ped, true)
-    PlaySpellSound("demon", 0.6)
+    PlaySpellSound("water", 0.6)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     TaskPlayAnim(ped, dict, anim, 2.0, 2.0, 6000, 1, 0.0, false, false, false)
     Notify('Vampiro', 'Alimentando-se do sangue da vítima...', 'success')
 
@@ -413,7 +429,7 @@ RegisterCommand('olhos_vampiro', function()
     visaoVampiro = not visaoVampiro
     SetNightvision(visaoVampiro)
     if visaoVampiro then
-        PlaySpellSound("mental", 0.4)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
         Notify('Vampiro', 'Visão Sombria ativada.', 'success')
     else
         Notify('Vampiro', 'Visão Sombria desativada.', 'inform')
@@ -434,7 +450,7 @@ RegisterCommand('velocidade_vampiro', function()
     velocidadeVampiro = true
     local pedId = PlayerId()
     SetRunSprintMultiplierForPlayer(pedId, Config.Vampiro.VelocidadeMultiplier or 1.49)
-    PlaySpellSound("demon", 0.4)
+    PlaySpellSound("tornado", 0.5)
     Notify('Vampiro', 'Arrancada Sobrenatural ativada!', 'success')
 
     CreateThread(function()
@@ -472,7 +488,8 @@ RegisterNetEvent('lumina_poderes:client:summonLightning', function()
     Wait(200)
     TaskPlayAnim(ped, dict, anim, 2.0, 2.0, 2000, 7, 0.0, false, false, false)
 
-    PlaySpellSound("tempestade_surja", 0.6)
+    PlaySpellSound("thunder", 0.7)
+    PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
     Wait(1200)
 
     TriggerServerEvent("lumina_poderes:server:syncLightning", targetCoords)
@@ -545,7 +562,8 @@ RegisterNetEvent('lumina_poderes:client:receiveLaugh', function(coords)
     local dist = #(coords - myCoords)
 
     if dist <= 50.0 then
-        PlaySpellSound("risada", 0.7)
+        PlaySpellSound("earthquake", 0.8)
+        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
         ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.4)
         Wait(2000)
         ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.0)
@@ -636,7 +654,8 @@ local function TransformarLobisomem()
 
     -- Efeito visual e sonoro da transformação
     local coords = GetEntityCoords(ped)
-    PlaySpellSound(Config.Lobisomem.AudioTransformation or "demon", 0.8)
+    PlaySpellSound(Config.Lobisomem.AudioTransformation or "earthquake", 0.8)
+    PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
 
     -- Animação dramática de transformação
     RequestAnim("anim@mp_player_intcelebrationmale@freakout")
@@ -728,7 +747,8 @@ local function TransformarLoboSirius()
     savedHumanModel = GetEntityModel(ped)
 
     local coords = GetEntityCoords(ped)
-    PlaySpellSound(Config.LoboSirius.AudioTransformation or "demon", 0.8)
+    PlaySpellSound(Config.LoboSirius.AudioTransformation or "earthquake", 0.8)
+    PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
 
     RequestNamedPtfxAsset("core")
     while not HasNamedPtfxAssetLoaded("core") do Wait(10) end
@@ -787,7 +807,8 @@ local function DestransformarLobisomem()
     end
 
     local coords = GetEntityCoords(ped)
-    PlaySpellSound("demon", 0.5)
+    PlaySpellSound("dirt", 0.5)
+    PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
 
     -- Fumaça da reversão
     RequestNamedPtfxAsset("core")
@@ -859,7 +880,7 @@ local function UivarLobisomem()
     end
 
     local coords = GetEntityCoords(ped)
-    PlaySpellSound(Config.Lobisomem.AudioHowl or "demon", 0.9)
+    PlaySpellSound(Config.Lobisomem.AudioHowl or "tornado", 0.9)
 
     if isLobisomem then
         RequestAnim("rcmnigel1a")
@@ -885,7 +906,7 @@ local function ToggleVisaoLobo()
     SetNightvision(lobisomemNightVision)
 
     if lobisomemNightVision then
-        PlaySpellSound("lux", 0.4)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
         Notify('Instinto Feral', 'Visão Noturna ATIVADA.', 'success')
     else
         Notify('Instinto Feral', 'Visão Noturna DESATIVADA.', 'inform')
@@ -938,7 +959,7 @@ RegisterNetEvent('lumina_poderes:client:receiveHowl', function(coords)
     local dist = #(coords - myCoords)
 
     if dist <= 60.0 then
-        PlaySpellSound("demon", 0.7)
+        PlaySpellSound("tornado", 0.7)
         ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.5)
         Wait(1500)
         ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.0)
@@ -973,7 +994,8 @@ RegisterNetEvent('lumina_poderes:client:playReviveCaster', function()
     local ped = PlayerPedId()
     RequestAnim("rcmepsilonism8")
     TaskPlayAnim(ped, "rcmepsilonism8", "worship_base", 8.0, -8.0, 7000, 1, 0, false, false, false)
-    PlaySpellSound("angel", 0.8)
+    PlaySpellSound("tornado", 0.4)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     Notify('Renascer', 'Você canalizou a luz celestial para reanimar a alma.', 'success')
     Wait(7000)
     ClearPedTasks(ped)
@@ -981,7 +1003,8 @@ end)
 
 RegisterNetEvent('lumina_poderes:client:playReviveVictim', function()
     local ped = PlayerPedId()
-    PlaySpellSound("angel", 0.9)
+    PlaySpellSound("tornado", 0.4)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
 
     -- Animação de anjo levitando
     RequestAnim("gx_s01@animation")
@@ -1032,7 +1055,8 @@ RegisterNetEvent('lumina_poderes:client:playDeathKissCaster', function()
     local ped = PlayerPedId()
     RequestAnim("rcmbarry")
     TaskPlayAnim(ped, "rcmbarry", "bar_1_teleport_aln", 8.0, -8.0, 4000, 49, 0, false, false, false)
-    PlaySpellSound("demon", 0.8)
+    PlaySpellSound("dirt", 0.7)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
 
     local curHp = GetEntityHealth(ped)
     local maxHp = GetEntityMaxHealth(ped)
@@ -1046,7 +1070,8 @@ end)
 
 RegisterNetEvent('lumina_poderes:client:playDeathKissVictim', function()
     local ped = PlayerPedId()
-    PlaySpellSound("demon", 0.7)
+    PlaySpellSound("dirt", 0.7)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
     ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.8)
 
     -- Partículas de sangue
@@ -1202,7 +1227,7 @@ RegisterCommand('ataquemental', function(source, args)
     local ped = PlayerPedId()
     RequestAnim("rcmbarry")
     TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
-    PlaySpellSound("mental", 0.8)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
 
     TriggerServerEvent('lumina_poderes:server:executeMentalAttack', targetId)
     Notify('Ataque Psíquico', 'Você disparou uma rajada mental devastadora!', 'success')
@@ -1216,7 +1241,8 @@ end, false)
 
 RegisterNetEvent('lumina_poderes:client:receiveMentalAttack', function(damage)
     local ped = PlayerPedId()
-    PlaySpellSound("mental", 0.8)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     ShakeGameplayCam('JOLT_SHAKE', 1.5)
 
     -- Partículas elétricas / mentais
@@ -1251,7 +1277,8 @@ RegisterCommand('luzdivina', function()
         TaskPlayAnim(ped, "rcmepsilonism8", "worship_base", 8.0, -8.0, 4000, 49, 0, false, false, false)
     end
 
-    PlaySpellSound("lux", 0.9)
+    PlaySpellSound("thunder", 0.8)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
     TriggerServerEvent('lumina_poderes:server:executeDivineLight', coords)
     Notify('Luz Divina', 'Você invocou o resplendor sagrado da Luz Divina!', 'success')
     Wait(4000)
@@ -1267,7 +1294,7 @@ RegisterNetEvent('lumina_poderes:client:receiveDivineLight', function(coords)
     local dist = #(coords - myCoords)
 
     if dist <= (Config.LuzDivina.Raio or 15.0) then
-        PlaySpellSound("lux", 0.8)
+        PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
         AnimpostfxPlay("DeadlineNeon", 3000, false)
         ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', 0.8)
         Notify('Luz Divina', 'Você foi cegado pelo clarão celestial!', 'warning')
@@ -1406,7 +1433,8 @@ RegisterCommand('crucificar', function(source, args)
         TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 4000, 49, 0, false, false, false)
     end
 
-    PlaySpellSound("demon", 0.8)
+    PlaySpellSound("dirt", 0.8)
+    PlaySoundFrontend(-1, "BASE_JUMP_PASSED", "HUD_AWARDS", true)
     TriggerServerEvent('lumina_poderes:server:executeCrucifixion', targetId)
     Notify('Crucificação', 'Você suspendeu a vítima na cruz invisível!', 'success')
     Wait(4000)
@@ -1416,7 +1444,8 @@ end, false)
 RegisterNetEvent('lumina_poderes:client:receiveCrucifixion', function(duration)
     local ped = PlayerPedId()
     duration = duration or 8000
-    PlaySpellSound("demon", 0.9)
+    PlaySpellSound("dirt", 0.8)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
 
     local coords = GetEntityCoords(ped)
     FreezeEntityPosition(ped, true)
@@ -1506,7 +1535,8 @@ RegisterCommand('telecinese', function()
 
     RequestAnim("rcmbarry")
     TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, -1, 49, 0, false, false, false)
-    PlaySpellSound("mental", 0.8)
+    PlaySpellSound("tornado", 0.4)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     Notify('Telecinese', 'Alvo LEVITADO! Use /telecinese novamente para arremessá-lo!', 'success')
 
     CreateThread(function()
@@ -1562,7 +1592,8 @@ RegisterCommand('escudo', function()
     end
 
     shieldActive = true
-    PlaySpellSound("lux", 0.9)
+    PlaySpellSound("dirt", 0.6)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     SetEntityInvincible(ped, true)
     SetPedCanRagdoll(ped, false)
     SetPedArmour(ped, 100)
@@ -2161,7 +2192,7 @@ RegisterCommand('buraconegro', function()
         TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 3000, 49, 0, false, false, false)
     end
 
-    PlaySpellSoundAtCoords("escuridao", coords, 55.0, 0.9)
+    PlaySpellSoundAtCoords("tornado", coords, 55.0, 0.9)
     TriggerServerEvent('lumina_poderes:server:syncBlackHole', coords)
     Notify('Buraco Negro', 'Você invocou um vórtex de matéria escura e gravidade singular!', 'success')
     Wait(2500)
@@ -2177,7 +2208,7 @@ RegisterNetEvent('lumina_poderes:client:receiveBlackHole', function(coords)
     LoadPtfx("scr_powerplay")
     LoadPtfx("core")
 
-    PlaySpellSoundAtCoords("escuridao", coords, 55.0, 0.95)
+    PlaySpellSoundAtCoords("tornado", coords, 55.0, 0.95)
 
     -- Partículas contínuas de fumaça escura abissal e distorção
     UseParticleFxAssetNextCall("scr_ba_bb")
@@ -2268,7 +2299,7 @@ RegisterCommand('fantasma', function()
     end
 
     isGhostActive = true
-    PlaySpellSound("mental", 0.8)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     SetEntityAlpha(ped, Config.FormaFantasma.TransparenciaAlpha or 110, false)
     SetEntityInvincible(ped, true)
     SetPedCanRagdoll(ped, false)
@@ -2293,7 +2324,7 @@ RegisterCommand('fantasma', function()
         SetEntityInvincible(ped, false)
         SetPedCanRagdoll(ped, true)
         SetRunSprintMultiplierForPlayer(pedId, 1.0)
-        PlaySpellSound("mental", 0.5)
+        PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
         Notify('Forma Fantasma', 'Você materializou seu corpo novamente.', 'inform')
     end)
 end, false)
@@ -2374,7 +2405,7 @@ RegisterCommand('puxar', function(source, args)
 
     RequestAnim("rcmbarry")
     TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 2000, 49, 0, false, false, false)
-    PlaySpellSound("demon", 0.8)
+    PlaySpellSound("tornado", 0.8)
 
     TriggerServerEvent('lumina_poderes:server:executeShadowPull', targetId, dest.x, dest.y, dest.z)
     Notify('Puxão Sombrio', 'Você arrastou a vítima até você com correntes sombrias!', 'success')
@@ -2384,7 +2415,8 @@ end, false)
 
 RegisterNetEvent('lumina_poderes:client:receiveShadowPull', function(destX, destY, destZ)
     local ped = PlayerPedId()
-    PlaySpellSound("demon", 0.8)
+    PlaySpellSound("dirt", 0.7)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
     SetPedToRagdoll(ped, 3000, 3000, 0, 0, 0, 0)
 
     local myCoords = GetEntityCoords(ped)
@@ -2468,7 +2500,8 @@ RegisterCommand('aura', function(source, args)
 
     RequestAnim("rcmbarry")
     TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 1500, 49, 0, false, false, false)
-    PlaySpellSoundAtCoords("lux", GetEntityCoords(ped), 40.0, 0.9)
+    PlaySpellSoundAtCoords("tornado", GetEntityCoords(ped), 40.0, 0.9)
+    PlaySoundFrontend(-1, "ScreenFlash", "WastedSounds", true)
     AnimpostfxPlay("DeadlineNeon", 2000, false)
 
     Notify('Aura Sobrenatural', ('Aura %s DESPERTADA! Velocidade e poder ampliados!'):format(colorData.name), 'success')
@@ -2609,7 +2642,7 @@ RegisterCommand('chamasnegras', function(source, args)
     local ped = PlayerPedId()
     RequestAnim("rcmbarry")
     TaskPlayAnim(ped, "rcmbarry", "bar_1_attack_idle_aln", 8.0, -8.0, 2000, 49, 0, false, false, false)
-    PlaySpellSoundAtCoords("demon", GetEntityCoords(ped), 40.0, 0.9)
+    PlaySpellSoundAtCoords("flame", GetEntityCoords(ped), 40.0, 0.95)
     AnimpostfxPlay("REDMIST", 1500, false)
 
     TriggerServerEvent('lumina_poderes:server:executeBlackFlames', targetId)
@@ -2686,7 +2719,7 @@ RegisterCommand('lanca', function()
     RequestAnim(dict)
     TaskPlayAnim(ped, dict, anim, 1.0, 1.0, -1, 49, 0.0, false, false, false)
 
-    PlaySpellSoundAtCoords("lux", GetEntityCoords(ped), 30.0, 0.7)
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
     Notify('Bola de Energia', 'Mire e pressione [E] ou [CLICK ESQUERDO] para disparar! [ESC] para cancelar.', 'inform')
 
     CreateThread(function()
@@ -2733,7 +2766,7 @@ RegisterCommand('lanca', function()
 
                     -- Sincroniza o disparo pelo ar com todos os jogadores
                     TriggerServerEvent('lumina_poderes:server:syncEnergyBall', startPos.x, startPos.y, startPos.z, chosenHit.x, chosenHit.y, chosenHit.z)
-                    PlaySpellSoundAtCoords("lux", startPos, 45.0, 0.9)
+                    PlaySpellSoundAtCoords("flame", startPos, 45.0, 0.9)
 
                     Wait(500)
                     ClearPedTasks(currentPed)
@@ -2801,7 +2834,7 @@ RegisterNetEvent('lumina_poderes:client:receiveEnergyBall', function(startX, sta
 
         -- Áudio estrondoso de trovão e impacto místico
         PlaySpellSoundAtCoords("thunder", hitCoords, 65.0, 1.0)
-        PlaySpellSoundAtCoords("lux", hitCoords, 60.0, 0.9)
+        PlaySpellSoundAtCoords("earthquake", hitCoords, 60.0, 0.9)
 
         -- Explosão real que destrói cenário, quebra vidros e causa dano
         AddExplosion(hitCoords.x, hitCoords.y, hitCoords.z + 0.3, 2, 100.0, true, false, 2.5)
@@ -2916,13 +2949,13 @@ RegisterCommand('portal', function()
             endTime = GetGameTimer() + (Config.Portal.DuracaoMs or 120000)
         }
         TriggerServerEvent('lumina_poderes:server:setPortal', myPortalState)
-        PlaySpellSoundAtCoords("lux", coords, 35.0, 0.8)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
         Notify('Portal Dimensional', 'Portal Alfa (Entrada) fincado! Use /portal em outro local para abrir a Saída!', 'success')
     elseif myPortalState.alfa and not myPortalState.beta then
         myPortalState.beta = coords
         myPortalState.endTime = GetGameTimer() + (Config.Portal.DuracaoMs or 120000)
         TriggerServerEvent('lumina_poderes:server:setPortal', myPortalState)
-        PlaySpellSoundAtCoords("lux", coords, 35.0, 0.8)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
         Notify('Portal Dimensional', 'Fenda Aberta! Os portais Alfa e Beta estão conectados!', 'success')
     else
         myPortalState = {
@@ -2931,7 +2964,7 @@ RegisterCommand('portal', function()
             endTime = GetGameTimer() + (Config.Portal.DuracaoMs or 120000)
         }
         TriggerServerEvent('lumina_poderes:server:setPortal', myPortalState)
-        PlaySpellSoundAtCoords("lux", coords, 35.0, 0.8)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
         Notify('Portal Dimensional', 'Novo Portal Alfa fincado! Use /portal no destino.', 'inform')
     end
 end, false)
@@ -2978,10 +3011,10 @@ CreateThread(function()
                         local distA = #(pCoords - a)
                         if distA <= (Config.Portal.RaioTeleporte or 1.6) then
                             lastTeleportTime = GetGameTimer()
-                            PlaySpellSoundAtCoords("escuridao", a, 30.0, 0.8)
+                            PlaySpellSoundAtCoords("tornado", a, 30.0, 0.8)
                             AnimpostfxPlay("CamPushInNeutral", 600, false)
                             SetEntityCoords(ped, pData.beta.x, pData.beta.y, pData.beta.z + 0.2, false, false, false, false)
-                            PlaySpellSoundAtCoords("lux", pData.beta, 30.0, 0.8)
+                            PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
                             Notify('Portal Dimensional', 'Você atravessou o Portal Alfa para Beta!', 'success')
                         end
                     end
@@ -2996,10 +3029,10 @@ CreateThread(function()
                         local distB = #(pCoords - b)
                         if distB <= (Config.Portal.RaioTeleporte or 1.6) then
                             lastTeleportTime = GetGameTimer()
-                            PlaySpellSoundAtCoords("escuridao", b, 30.0, 0.8)
+                            PlaySpellSoundAtCoords("tornado", b, 30.0, 0.8)
                             AnimpostfxPlay("CamPushInNeutral", 600, false)
                             SetEntityCoords(ped, pData.alfa.x, pData.alfa.y, pData.alfa.z + 0.2, false, false, false, false)
-                            PlaySpellSoundAtCoords("lux", pData.alfa, 30.0, 0.8)
+                            PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
                             Notify('Portal Dimensional', 'Você atravessou o Portal Beta para Alfa!', 'success')
                         end
                     end
@@ -3067,7 +3100,7 @@ RegisterNetEvent('lumina_poderes:client:receiveDome', function(casterSrc, coords
             end
         end
 
-        PlaySpellSoundAtCoords("lux", coords, 40.0, 0.6)
+        PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
     end)
 end)
 
@@ -3099,7 +3132,7 @@ RegisterCommand('olhomistico', function()
     local ped = PlayerPedId()
 
     if isMysticEyeActive then
-        PlaySpellSound("lux", 0.8)
+        PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
         SetTimecycleModifier("REDMIST")
         SetTimecycleModifierStrength(0.4)
         AnimpostfxPlay("SwitchSceneMichael", 1000, false)
