@@ -5,7 +5,7 @@
 ================================================================================
 
 Este pacote contem:
-1. lomar_poderes         -> Script completo com 44 poderes sobrenaturais e combos cinematográficos de combate, animacoes personalizadas, audio 3D espacial NUI, sistema de mira dinamica e particulas sincronizadas em rede (LOMAR DEV)
+1. lomar_poderes         -> Script completo com 45 poderes sobrenaturais e combos cinematográficos de combate, animacoes personalizadas, audio 3D espacial NUI, sistema de mira dinamica e particulas sincronizadas em rede (LOMAR DEV)
 2. Lupino_Lumina         -> Modelo 3D da fera Lobisomem gigante (WereWolf) com 400 HP e super forca (LOMAR DEV)
 3. Lobo_Sirius_Lumina    -> Modelo 3D do Lobo Sirius de 4 patas ágil e veloz (LOMAR DEV)
 
@@ -25,7 +25,7 @@ COMO INSTALAR NA BASE MRI:
    carregamento assinada por LOMAR DEV no console!
 
 --------------------------------------------------------------------------------
-LISTA COMPLETA DOS PODERES E COMANDOS (44 PODERES E COMBOS):
+LISTA COMPLETA DOS PODERES E COMANDOS (45 PODERES E COMBOS):
 --------------------------------------------------------------------------------
 TRANSFORMAÇÕES LUPINAS:
 1.  /lobisomem ou /lobao         -> Transforma seu personagem no Lobisomem gigante com
@@ -71,57 +71,61 @@ PODERES CRIATIVOS & ARCANOS AVANÇADOS:
                                     imunidade total a tiros e empurra com força quem tentar encostar
 16. /clones                      -> Guardiões de sombra em formação circular 360° ao redor do jogador:
                                     escoltam seus passos em tempo real, sem colisão e atacam ameaças próximas!
-17. /fantasma                    -> Transforma seu corpo em forma espectral translúcida (invisibilidade parcial),
+17. /clonesmax ou                -> Multidão de 20 Clones Armados (Legião de Sombras):
+    /multidaoclones ou              invoca uma formação em anéis concêntricos (8 internos + 12 externos)
+    /legiaodeclones                 equipados com pistolas táticas, sem colisão no mestre e que abrem fogo
+    ou /exercitodeclones            coordenado real contra qualquer ameaça hostil detectada!
+18. /fantasma                    -> Transforma seu corpo em forma espectral translúcida (invisibilidade parcial),
                                     imune a dano e com velocidade aumentada por 10s
-18. /congelar [id]               -> Dispara uma rajada gélida de criomancia que congela a tela do alvo
+19. /congelar [id]               -> Dispara uma rajada gélida de criomancia que congela a tela do alvo
                                     e o deixa totalmente imóvel no solo por 8 segundos
-19. /puxar [id]                  -> Lança correntes sombrias que arrastam a vítima pelo ar direto até você
-20. /parartempo                  -> Para o fluxo temporal ao seu redor: congela todos os jogadores e NPCs
+20. /puxar [id]                  -> Lança correntes sombrias que arrastam a vítima pelo ar direto até você
+21. /parartempo                  -> Para o fluxo temporal ao seu redor: congela todos os jogadores e NPCs
                                     próximos por 6 segundos enquanto só você se move!
 
 PODERES DE VIDA, MORTE & SANGUE:
-21. /renascer ou /reviver [id]   -> Ressuscitação celestial: o conjurador ajoelha em prece,
+22. /renascer ou /reviver [id]   -> Ressuscitação celestial: o conjurador ajoelha em prece,
                                     a vítima abatida levita com aura angelical (angel.ogg)
                                     e é revivida com vida cheia e ferimentos limpos
-22. /beijodamorte [id]           -> O vampiro drena a essência vital da vítima próxima com
+23. /beijodamorte [id]           -> O vampiro drena a essência vital da vítima próxima com
                                     esguicho de sangue, causando 50 de dano e restaurando
                                     completamente a vida e colete do vampiro
-23. /morder ou /alimentar        -> Mordida sincronizada de vampiro que drena vida
-24. /olhos_vampiro               -> Visão noturna sombria de predador
-25. /velocidade_vampiro          -> Arrancada veloz com rastro escuro por 12s
+24. /morder ou /alimentar        -> Mordida sincronizada de vampiro que drena vida
+25. /olhos_vampiro               -> Visão noturna sombria de predador
+26. /velocidade_vampiro          -> Arrancada veloz com rastro escuro por 12s
 
 PODERES ELEMENTAIS & MÍSTICOS:
-26. /canto_sereia [id] /hipnose  -> Canto hipnótico da sereia: deixa alvos próximos em transe,
+27. /canto_sereia [id] /hipnose  -> Canto hipnótico da sereia: deixa alvos próximos em transe,
                                     tropeçando desorientados com a visão embriagada
-27. /respiracao ou /sereia       -> Nado veloz, fôlego infinito e proteção na água
-28. /petrificar [id]             -> Canaliza a força da terra: petrifica o alvo transformando-o
+28. /respiracao ou /sereia       -> Nado veloz, fôlego infinito e proteção na água
+29. /petrificar [id]             -> Canaliza a força da terra: petrifica o alvo transformando-o
                                     numa estátua de pedra sólida e imóvel por 10 segundos
-29. /ataquemental [id] /psiquico -> Dispara uma rajada telepática na mente da vítima, causando
+30. /ataquemental [id] /psiquico -> Dispara uma rajada telepática na mente da vítima, causando
                                     agonia, dano psíquico e visão perturbada
-30. /luzdivina ou /purificar     -> Invoca um resplendor de luz celestial que cega e desorienta
+31. /luzdivina ou /purificar     -> Invoca um resplendor de luz celestial que cega e desorienta
                                     inimigos na área
-31. /prisao_agua [id] ou /afogar -> Envolve o alvo numa esfera de água mágica, fazendo-o nadar
+32. /prisao_agua [id] ou /afogar -> Envolve o alvo numa esfera de água mágica, fazendo-o nadar
                                     no ar e se afogar no seco sofrendo dano
-32. /tornado ou /vendaval        -> Cria um vórtice violento de vento que derruba e arremessa
+33. /tornado ou /vendaval        -> Cria um vórtice violento de vento que derruba e arremessa
                                     todos ao redor ao chão (ragdoll)
-33. /crucificar [id]             -> Suspende a vítima a 1.6m do chão numa crucificação arcana,
+34. /crucificar [id]             -> Suspende a vítima a 1.6m do chão numa crucificação arcana,
                                     deixando-a totalmente imobilizada e indefesa
-34. /tpmagico ou /tpcast         -> Teleporte com mira no chão, raio e trovão
-35. /levitar ou /levitate        -> Flutua e medita no ar (aperte E para descer)
-36. /magia_fogo ou /flametest    -> Lança-chamas mágico pelas mãos (aperte E para usar)
-37. /fumaca ou /desaparecer      -> Explosão de névoa mística e trevas
-38. /raio ou /tempestade         -> Invoca raio real do céu com mira no chão
-39. /terremoto                   -> Faz a terra tremer com estrondo de terremoto
-40. /risada ou /aterrorizar      -> Risada demoníaca que aterroriza quem estiver perto
+35. /tpmagico ou /tpcast         -> Teleporte com mira no chão, raio e trovão
+36. /levitar ou /levitate        -> Flutua e medita no ar (aperte E para descer)
+37. /magia_fogo ou /flametest    -> Lança-chamas mágico pelas mãos (aperte E para usar)
+38. /fumaca ou /desaparecer      -> Explosão de névoa mística e trevas
+39. /raio ou /tempestade         -> Invoca raio real do céu com mira no chão
+40. /terremoto                   -> Faz a terra tremer com estrondo de terremoto
+41. /risada ou /aterrorizar      -> Risada demoníaca que aterroriza quem estiver perto
 
 COMBOS CINEMATOGRÁFICOS DE COMBATE (LOMAR DEV):
-41. /blinkstrike ou              -> Combo Teleporte 3-Hit Cinematográfico: teleporte veloz atrás da nuca,
+42. /blinkstrike ou              -> Combo Teleporte 3-Hit Cinematográfico: teleporte veloz atrás da nuca,
     /comboteleporte                 axe hammer descendente no ar e soco reto em slow-mo lançando o alvo a 45m!
-42. /chokeslam ou                -> Agarrão Devastador: avanço com rastro de energia, estrangulamento
+43. /chokeslam ou                -> Agarrão Devastador: avanço com rastro de energia, estrangulamento
     /agarrardevastador              com elevação no ar e arremesso destruidor contra o solo com cratera.
-43. /barrage ou                  -> Chuva de Golpes: 18 socos em velocidade sobre-humana (2s) com rastros
+44. /barrage ou                  -> Chuva de Golpes: 18 socos em velocidade sobre-humana (2s) com rastros
     /chuvadegolpes                  de luz alternados nos punhos e finalização em onda de choque com as duas mãos!
-44. /comboarea ou /massacre ou   -> Massacre em Área: mira circular que trava em até 20 entidades simultâneas;
+45. /comboarea ou /massacre ou   -> Massacre em Área: mira circular que trava em até 20 entidades simultâneas;
     /combomultiplo                  executa sequência alternada de golpes e eleva a câmera orbital aos 14m a partir
                                     do 5º alvo para registrar toda a devastação com retorno 100% automático.
 

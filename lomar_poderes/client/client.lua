@@ -1778,6 +1778,286 @@ RegisterCommand('clones', function()
 end, false)
 
 -- =========================================================================
+-- 24.1 MULTIDÃO DE CLONES ARMADOS / LEGIÃO DE SOMBRA (20 CLONES) (LOMAR DEV)
+-- =========================================================================
+local activeClonesMax = nil
+
+local function DispelClonesMax()
+    if activeClonesMax and #activeClonesMax > 0 then
+        for _, clone in ipairs(activeClonesMax) do
+            if DoesEntityExist(clone) then
+                local cCoords = GetEntityCoords(clone)
+                UseParticleFxAssetNextCall("core")
+                StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", cCoords.x, cCoords.y, cCoords.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
+                DeleteEntity(clone)
+            end
+        end
+        activeClonesMax = nil
+        PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
+        Notify('Legião de Clones', 'Sua multidão de clones se dissipou nas sombras.', 'inform')
+    end
+end
+
+RegisterCommand('clonesmax', function()
+    local ped = PlayerPedId()
+
+    -- Se já tiver clones ativos, dissipa-os (modo toggle)
+    if activeClonesMax and #activeClonesMax > 0 then
+        DispelClonesMax()
+        return
+    end
+
+    if IsPedDeadOrDying(ped, true) then
+        Notify('Legião de Clones', 'Você não pode invocar clones agora.', 'error')
+        return
+    end
+
+    local pCoords = GetEntityCoords(ped)
+    local pHeading = GetEntityHeading(ped)
+
+    PlaySoundFrontend(-1, "FocusIn", "HintCamSounds", true)
+    ShakeGameplayCam('JOLT_SHAKE', 0.6)
+
+    RequestNamedPtfxAsset("core")
+    while not HasNamedPtfxAssetLoaded("core") do Wait(10) end
+
+    local weaponHash = GetHashKey(Config.ClonesMax and Config.ClonesMax.Arma or "WEAPON_COMBATPISTOL")
+    RequestWeaponAsset(weaponHash, 31, 0)
+    local wTimeout = 0
+    while not HasWeaponAssetLoaded(weaponHash) and wTimeout < 100 do
+        Wait(10)
+        wTimeout = wTimeout + 1
+    end
+
+    UseParticleFxAssetNextCall("core")
+    StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", pCoords.x, pCoords.y, pCoords.z, 0.0, 0.0, 0.0, 2.5, false, false, false)
+
+    local radiusInner = Config.ClonesMax and Config.ClonesMax.RaioInterno or 2.6
+    local radiusOuter = Config.ClonesMax and Config.ClonesMax.RaioExterno or 5.0
+    local countInner = 8
+    local countOuter = 12
+
+    local slots = {}
+    local stepInner = 360.0 / countInner
+    for i = 1, countInner do
+        table.insert(slots, {
+            radius = radiusInner,
+            angleOffset = (i - 1) * stepInner
+        })
+    end
+
+    local stepOuter = 360.0 / countOuter
+    for i = 1, countOuter do
+        table.insert(slots, {
+            radius = radiusOuter,
+            angleOffset = ((i - 1) * stepOuter) + (stepOuter / 2.0)
+        })
+    end
+
+    local clones = {}
+    local accuracy = Config.ClonesMax and Config.ClonesMax.Precisao or 75
+
+    for _, slot in ipairs(slots) do
+        local rad = math.rad((pHeading + slot.angleOffset) % 360.0)
+        local spawnPos = pCoords + vector3(-math.sin(rad) * slot.radius, math.cos(rad) * slot.radius, 0.0)
+
+        local clone = ClonePed(ped, false, false, false)
+        if DoesEntityExist(clone) then
+            SetEntityCoordsNoOffset(clone, spawnPos.x, spawnPos.y, spawnPos.z, false, false, false)
+            SetEntityHeading(clone, (pHeading + slot.angleOffset + 180.0) % 360.0)
+
+            SetEntityInvincible(clone, true)
+            SetPedCanRagdoll(clone, false)
+            SetBlockingOfNonTemporaryEvents(clone, true)
+            SetPedCombatAttributes(clone, 46, true) -- ALWAYS_FIGHT
+            SetPedCombatAttributes(clone, 0, true)  -- CAN_USE_COVER
+            SetPedCombatAttributes(clone, 5, true)  -- CAN_FIGHT_ARMED_PEDS_WHEN_NOT_ARMED
+            SetPedCombatAbility(clone, 2)           -- PROFESSIONAL
+            SetPedCombatRange(clone, 2)             -- FAR
+            SetPedAccuracy(clone, accuracy)
+            SetPedFiringPattern(clone, GetHashKey("FIRING_PATTERN_BURST_FIRE_PISTOL"))
+            SetEntityNoCollisionEntity(clone, ped, false)
+
+            GiveWeaponToPed(clone, weaponHash, 9999, false, true)
+            SetCurrentPedWeapon(clone, weaponHash, true)
+            SetPedInfiniteAmmo(clone, true, weaponHash)
+            SetPedInfiniteAmmoClip(clone, true)
+
+            UseParticleFxAssetNextCall("core")
+            StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", spawnPos.x, spawnPos.y, spawnPos.z, 0.0, 0.0, 0.0, 1.1, false, false, false)
+
+            table.insert(clones, {
+                entity = clone,
+                radius = slot.radius,
+                angleOffset = slot.angleOffset,
+                isShooting = false
+            })
+        end
+    end
+
+    -- Remove colisões entre todos os clones para fluidez perfeita da multidão
+    for a = 1, #clones do
+        for b = a + 1, #clones do
+            if DoesEntityExist(clones[a].entity) and DoesEntityExist(clones[b].entity) then
+                SetEntityNoCollisionEntity(clones[a].entity, clones[b].entity, false)
+            end
+        end
+    end
+
+    activeClonesMax = {}
+    for _, c in ipairs(clones) do
+        table.insert(activeClonesMax, c.entity)
+    end
+
+    Notify('Legião de Clones', 'Multidão de 20 clones armados invocada! Eles formaram uma barreira defensiva concêntrica e abrirão fogo contra qualquer ameaça.', 'success')
+
+    -- Thread de escolta e ataque armado em multidão
+    CreateThread(function()
+        local duration = Config.ClonesMax and Config.ClonesMax.DuracaoMs or 50000
+        local maxThreatDist = Config.ClonesMax and Config.ClonesMax.RaioDeteccaoAmeaca or 35.0
+        local startTime = GetGameTimer()
+
+        while activeClonesMax and #activeClonesMax > 0 and (GetGameTimer() - startTime) < duration do
+            Wait(100)
+            local currentMaster = PlayerPedId()
+
+            if IsPedDeadOrDying(currentMaster, true) then
+                break
+            end
+
+            local curPos = GetEntityCoords(currentMaster)
+            local curHeading = GetEntityHeading(currentMaster)
+            local isMasterMoving = GetEntitySpeed(currentMaster) > 0.5
+
+            -- 1. Varredura inteligente de ameaças reais
+            local threatList = {}
+            local playerAimingEntity = nil
+            local _, targetedEntity = GetEntityPlayerIsFreeAimingAt(PlayerId())
+            if targetedEntity and DoesEntityExist(targetedEntity) and IsEntityAPed(targetedEntity) and not IsPedDeadOrDying(targetedEntity, true) then
+                playerAimingEntity = targetedEntity
+            end
+
+            for _, p in ipairs(GetGamePool('CPed')) do
+                if DoesEntityExist(p) and p ~= currentMaster and not IsPedDeadOrDying(p, true) then
+                    local isOurClone = false
+                    for _, c in ipairs(clones) do
+                        if p == c.entity then isOurClone = true break end
+                    end
+                    if not isOurClone and activeCloneGuardians then
+                        for _, cg in ipairs(activeCloneGuardians) do
+                            if p == cg then isOurClone = true break end
+                        end
+                    end
+
+                    if not isOurClone then
+                        local pDist = #(GetEntityCoords(p) - curPos)
+                        if pDist <= maxThreatDist then
+                            local isThreat = false
+                            if p == playerAimingEntity then
+                                isThreat = true
+                            elseif IsPedInCombat(p, currentMaster) then
+                                isThreat = true
+                            elseif IsPedShooting(p) then
+                                isThreat = true
+                            elseif IsPedArmed(p, 7) and pDist <= 22.0 then
+                                isThreat = true
+                            end
+
+                            if isThreat then
+                                table.insert(threatList, { ped = p, dist = pDist })
+                            end
+                        end
+                    end
+                end
+            end
+
+            if #threatList > 1 then
+                table.sort(threatList, function(a, b) return a.dist < b.dist end)
+            end
+
+            -- 2. Disparos coordenados dos clones contra as ameaças reais
+            if #threatList > 0 then
+                local primaryThreat = threatList[1].ped
+                for idx, cData in ipairs(clones) do
+                    local clone = cData.entity
+                    if DoesEntityExist(clone) then
+                        local targetForThisClone = primaryThreat
+                        if #threatList > 1 then
+                            local targetIdx = ((idx - 1) % #threatList) + 1
+                            targetForThisClone = threatList[targetIdx].ped
+                        end
+
+                        if DoesEntityExist(targetForThisClone) and not IsPedDeadOrDying(targetForThisClone, true) then
+                            local cCoords = GetEntityCoords(clone)
+                            local dToMaster = #(cCoords - curPos)
+
+                            if dToMaster > 18.0 then
+                                TaskGoStraightToCoord(clone, curPos.x, curPos.y, curPos.z, 3.2, 300, 0.0, 0.0)
+                            else
+                                if not cData.isShooting or math.random(1, 4) == 1 then
+                                    TaskShootAtEntity(clone, targetForThisClone, 1500, GetHashKey("FIRING_PATTERN_BURST_FIRE_PISTOL"))
+                                    cData.isShooting = true
+                                end
+                            end
+                        end
+                    end
+                end
+            else
+                -- 3. Sem ameaças ativas: formação de multidão concêntrica escoltando o mestre
+                for _, cData in ipairs(clones) do
+                    local clone = cData.entity
+                    if DoesEntityExist(clone) then
+                        if cData.isShooting then
+                            ClearPedTasks(clone)
+                            SetCurrentPedWeapon(clone, weaponHash, true)
+                            cData.isShooting = false
+                        end
+
+                        local rad = math.rad((curHeading + cData.angleOffset) % 360.0)
+                        local targetSlot = curPos + vector3(-math.sin(rad) * cData.radius, math.cos(rad) * cData.radius, 0.0)
+                        local clonePos = GetEntityCoords(clone)
+                        local distToSlot = #(clonePos - targetSlot)
+                        local distToMaster = #(clonePos - curPos)
+
+                        if distToMaster > 25.0 then
+                            SetEntityCoordsNoOffset(clone, targetSlot.x, targetSlot.y, targetSlot.z, false, false, false)
+                            SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
+                            UseParticleFxAssetNextCall("core")
+                            StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", targetSlot.x, targetSlot.y, targetSlot.z, 0.0, 0.0, 0.0, 1.0, false, false, false)
+                        else
+                            if isMasterMoving or distToSlot > 1.2 then
+                                local moveSpeed = isMasterMoving and (GetEntitySpeed(currentMaster) > 4.0 and 3.5 or 2.2) or 1.8
+                                TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, moveSpeed, 300, 0.0, 0.0)
+                            else
+                                SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
+                                if GetSelectedPedWeapon(clone) ~= weaponHash then
+                                    SetCurrentPedWeapon(clone, weaponHash, true)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        DispelClonesMax()
+    end)
+end, false)
+
+RegisterCommand('multidaoclones', function()
+    ExecuteCommand('clonesmax')
+end, false)
+
+RegisterCommand('legiaodeclones', function()
+    ExecuteCommand('clonesmax')
+end, false)
+
+RegisterCommand('exercitodeclones', function()
+    ExecuteCommand('clonesmax')
+end, false)
+
+-- =========================================================================
+
 -- 25. BURACO NEGRO / VÓRTICE GRAVITACIONAL APRIMORADO (LOMAR DEV)
 -- =========================================================================
 RegisterCommand('buraconegro', function()

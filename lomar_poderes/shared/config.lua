@@ -135,6 +135,16 @@ Config.ClonesSombra = {
     RaioCirculo = 2.4 -- distância do círculo protetor ao redor do personagem
 }
 
+Config.ClonesMax = {
+    Quantidade = 20,              -- Multidão de 20 clones protetores
+    RaioInterno = 2.6,            -- Anel interno (8 clones)
+    RaioExterno = 5.0,            -- Anel externo (12 clones)
+    DuracaoMs = 50000,            -- 50 segundos de escolta armada
+    Arma = "WEAPON_COMBATPISTOL", -- Arma de fogo dos clones (ex: WEAPON_COMBATPISTOL, WEAPON_MICROSMG, WEAPON_CARBINERIFLE)
+    Precisao = 75,                -- Precisão de tiro dos clones (0-100)
+    RaioDeteccaoAmeaca = 35.0     -- Distância máxima para detectar e abrir fogo contra inimigos
+}
+
 Config.BuracoNegro = {
     DistanciaMira = 40.0,
     RaioSugador = 22.0,
