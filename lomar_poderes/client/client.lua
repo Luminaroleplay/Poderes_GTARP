@@ -1607,7 +1607,7 @@ local activeCloneGuardians = nil
 local function DispelCloneGuardians()
     if activeCloneGuardians and #activeCloneGuardians > 0 then
         for _, clone in ipairs(activeCloneGuardians) do
-            if DoesEntityExist(clone) then
+            if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
                 local cCoords = GetEntityCoords(clone)
                 UseParticleFxAssetNextCall("core")
                 StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", cCoords.x, cCoords.y, cCoords.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
@@ -1616,14 +1616,14 @@ local function DispelCloneGuardians()
         end
         activeCloneGuardians = nil
         PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
-        Notify('Clones', 'Seus clones guardiões de sombra se dissiparam.', 'inform')
+        Notify('Clones', 'Seus clones guardiões foram dispensados.', 'inform')
     end
 end
 
 RegisterCommand('clones', function()
     local ped = PlayerPedId()
 
-    -- Se já tiver clones ativos, dissipa-os (modo toggle)
+    -- Se já tiver clones ativos, dissipa-os (modo toggle manual)
     if activeCloneGuardians and #activeCloneGuardians > 0 then
         DispelCloneGuardians()
         return
@@ -1651,6 +1651,7 @@ RegisterCommand('clones', function()
     local radius = Config.ClonesSombra.RaioCirculo or 2.4
     local clones = {}
     local angleStep = 360.0 / count
+    local hp = Config.ClonesSombra and Config.ClonesSombra.Vida or 200
 
     for i = 1, count do
         local angleOffset = (i - 1) * angleStep
@@ -1662,8 +1663,13 @@ RegisterCommand('clones', function()
             SetEntityCoordsNoOffset(clone, spawnPos.x, spawnPos.y, spawnPos.z, false, false, false)
             SetEntityHeading(clone, (pHeading + angleOffset + 180.0) % 360.0)
 
-            SetEntityInvincible(clone, true)
-            SetPedCanRagdoll(clone, false)
+            -- Clones são mortais como todo NPC do servidor
+            SetEntityInvincible(clone, false)
+            SetPedCanRagdoll(clone, true)
+            SetPedCanRagdollFromPlayerImpact(clone, true)
+            SetEntityMaxHealth(clone, hp)
+            SetEntityHealth(clone, hp)
+            SetPedArmour(clone, 50)
             SetBlockingOfNonTemporaryEvents(clone, true)
             SetPedCombatAttributes(clone, 46, true)
             SetPedFleeAttributes(clone, 0, false)
@@ -1695,28 +1701,55 @@ RegisterCommand('clones', function()
         table.insert(activeCloneGuardians, c.entity)
     end
 
-    Notify('Clones', 'Guardiões de sombra invocados! Eles formaram um círculo protetor de 360° ao seu redor.', 'success')
+    Notify('Clones', 'Guardiões invocados! Eles seguirão você pelo mapa até morrerem ou se perderem.', 'success')
 
-    -- Thread de escolta e proteção em círculo ativo
+    -- Thread de escolta contínua: seguem até morrer ou se perder no servidor como todo NPC
     CreateThread(function()
-        local duration = Config.ClonesSombra.DuracaoMs or 35000
-        local startTime = GetGameTimer()
+        local maxLostDist = Config.ClonesSombra and Config.ClonesSombra.DistanciaPerdido or 75.0
 
-        while activeCloneGuardians and #activeCloneGuardians > 0 and (GetGameTimer() - startTime) < duration do
+        while activeCloneGuardians and #activeCloneGuardians > 0 do
             Wait(100)
             local currentMaster = PlayerPedId()
-
-            if IsPedDeadOrDying(currentMaster, true) then
-                break
-            end
-
+            local masterDead = IsPedDeadOrDying(currentMaster, true)
             local curPos = GetEntityCoords(currentMaster)
             local curHeading = GetEntityHeading(currentMaster)
             local isMasterMoving = GetEntitySpeed(currentMaster) > 0.5
 
-            -- 1. Varredura de ameaças próximas para proteção ativa
+            -- 1. Filtra clones vivos vs mortos vs perdidos
+            local livingClones = {}
+            for _, cData in ipairs(clones) do
+                local clone = cData.entity
+                if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
+                    local clonePos = GetEntityCoords(clone)
+                    local distToMaster = #(clonePos - curPos)
+
+                    -- Se o jogador correu/viajou para muito longe (> 75m) e o clone se perdeu
+                    if distToMaster > maxLostDist and not masterDead then
+                        -- O clone se perde no servidor como todo NPC
+                        SetPedAsNoLongerNeeded(clone)
+                        SetBlockingOfNonTemporaryEvents(clone, false)
+                        SetPedCombatAttributes(clone, 46, false)
+                        TaskWanderStandard(clone, 10.0, 10)
+                    else
+                        table.insert(livingClones, cData)
+                    end
+                end
+                -- Se o clone morreu (IsPedDeadOrDying), ele NÃO é deletado; fica no chão como defunto
+            end
+
+            clones = livingClones
+            activeCloneGuardians = {}
+            for _, c in ipairs(clones) do
+                table.insert(activeCloneGuardians, c.entity)
+            end
+
+            if #clones == 0 then
+                break
+            end
+
+            -- 2. Varredura de ameaças próximas para proteção ativa
             local threatPed = nil
-            local minThreatDist = 5.0
+            local minThreatDist = 6.0
             for _, p in ipairs(GetGamePool('CPed')) do
                 if DoesEntityExist(p) and p ~= currentMaster and not IsPedDeadOrDying(p, true) then
                     local isClone = false
@@ -1733,35 +1766,25 @@ RegisterCommand('clones', function()
                 end
             end
 
-            -- 2. Atualiza a posição de cada clone na formação circular
+            -- 3. Atualiza posicionamento e escolta de cada clone vivo
             for _, cData in ipairs(clones) do
                 local clone = cData.entity
-                if DoesEntityExist(clone) then
+                if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
                     local rad = math.rad((curHeading + cData.angleOffset) % 360.0)
                     local targetSlot = curPos + vector3(-math.sin(rad) * radius, math.cos(rad) * radius, 0.0)
                     local clonePos = GetEntityCoords(clone)
                     local distToSlot = #(clonePos - targetSlot)
                     local distToMaster = #(clonePos - curPos)
 
-                    -- Se o jogador teleportar ou correr muito rápido para longe (> 20m), flash-step de volta ao círculo
-                    if distToMaster > 20.0 then
-                        SetEntityCoordsNoOffset(clone, targetSlot.x, targetSlot.y, targetSlot.z, false, false, false)
-                        SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
-                        UseParticleFxAssetNextCall("core")
-                        StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", targetSlot.x, targetSlot.y, targetSlot.z, 0.0, 0.0, 0.0, 1.0, false, false, false)
-                    elseif threatPed and DoesEntityExist(threatPed) and distToMaster <= 6.0 then
-                        if #(clonePos - GetEntityCoords(threatPed)) < 4.0 then
+                    if threatPed and DoesEntityExist(threatPed) and not IsPedDeadOrDying(threatPed, true) and distToMaster <= 8.0 then
+                        if #(clonePos - GetEntityCoords(threatPed)) < 5.0 then
                             TaskCombatPed(clone, threatPed, 0, 16)
                             ApplyDamageToPed(threatPed, 10, false)
                         end
                     else
-                        -- Mantém o círculo protetor perfeito em torno do mestre
                         if isMasterMoving or distToSlot > 1.2 then
-                            if distToSlot > 3.5 then
-                                TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, 3.0, 400, 0.0, 0.0)
-                            else
-                                TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, 1.8, 300, 0.0, 0.0)
-                            end
+                            local moveSpeed = isMasterMoving and (GetEntitySpeed(currentMaster) > 4.0 and 3.5 or 2.2) or 1.8
+                            TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, moveSpeed, 300, 0.0, 0.0)
                         else
                             SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
                             if not IsEntityPlayingAnim(clone, "move_m@intimidation@cop@unarmed", "idle", 3) then
@@ -1773,7 +1796,7 @@ RegisterCommand('clones', function()
             end
         end
 
-        DispelCloneGuardians()
+        activeCloneGuardians = nil
     end)
 end, false)
 
@@ -1785,7 +1808,7 @@ local activeClonesMax = nil
 local function DispelClonesMax()
     if activeClonesMax and #activeClonesMax > 0 then
         for _, clone in ipairs(activeClonesMax) do
-            if DoesEntityExist(clone) then
+            if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
                 local cCoords = GetEntityCoords(clone)
                 UseParticleFxAssetNextCall("core")
                 StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", cCoords.x, cCoords.y, cCoords.z, 0.0, 0.0, 0.0, 1.2, false, false, false)
@@ -1794,14 +1817,14 @@ local function DispelClonesMax()
         end
         activeClonesMax = nil
         PlaySoundFrontend(-1, "FocusOut", "HintCamSounds", true)
-        Notify('Legião de Clones', 'Sua multidão de clones se dissipou nas sombras.', 'inform')
+        Notify('Legião de Clones', 'Sua multidão de clones foi dispensada.', 'inform')
     end
 end
 
 RegisterCommand('clonesmax', function()
     local ped = PlayerPedId()
 
-    -- Se já tiver clones ativos, dissipa-os (modo toggle)
+    -- Se já tiver clones ativos, dissipa-os (modo toggle manual)
     if activeClonesMax and #activeClonesMax > 0 then
         DispelClonesMax()
         return
@@ -1856,6 +1879,8 @@ RegisterCommand('clonesmax', function()
 
     local clones = {}
     local accuracy = Config.ClonesMax and Config.ClonesMax.Precisao or 75
+    local maxHp = Config.ClonesMax and Config.ClonesMax.Vida or 200
+    local armour = Config.ClonesMax and Config.ClonesMax.Colete or 50
 
     for _, slot in ipairs(slots) do
         local rad = math.rad((pHeading + slot.angleOffset) % 360.0)
@@ -1866,8 +1891,13 @@ RegisterCommand('clonesmax', function()
             SetEntityCoordsNoOffset(clone, spawnPos.x, spawnPos.y, spawnPos.z, false, false, false)
             SetEntityHeading(clone, (pHeading + slot.angleOffset + 180.0) % 360.0)
 
-            SetEntityInvincible(clone, true)
-            SetPedCanRagdoll(clone, false)
+            -- Clones mortais com vida e dano real (morrem como qualquer NPC)
+            SetEntityInvincible(clone, false)
+            SetPedCanRagdoll(clone, true)
+            SetPedCanRagdollFromPlayerImpact(clone, true)
+            SetEntityMaxHealth(clone, maxHp)
+            SetEntityHealth(clone, maxHp)
+            SetPedArmour(clone, armour)
             SetBlockingOfNonTemporaryEvents(clone, true)
             SetPedCombatAttributes(clone, 46, true) -- ALWAYS_FIGHT
             SetPedCombatAttributes(clone, 0, true)  -- CAN_USE_COVER
@@ -1909,27 +1939,54 @@ RegisterCommand('clonesmax', function()
         table.insert(activeClonesMax, c.entity)
     end
 
-    Notify('Legião de Clones', 'Multidão de 20 clones armados invocada! Eles formaram uma barreira defensiva concêntrica e abrirão fogo contra qualquer ameaça.', 'success')
+    Notify('Legião de Clones', 'Multidão de 20 clones armados invocada! Eles seguirão você pelo mapa até morrerem ou se perderem.', 'success')
 
-    -- Thread de escolta e ataque armado em multidão
+    -- Thread de escolta contínua: seguem até morrer em combate ou se perderem no servidor como todo NPC
     CreateThread(function()
-        local duration = Config.ClonesMax and Config.ClonesMax.DuracaoMs or 50000
         local maxThreatDist = Config.ClonesMax and Config.ClonesMax.RaioDeteccaoAmeaca or 35.0
-        local startTime = GetGameTimer()
+        local maxLostDist = Config.ClonesMax and Config.ClonesMax.DistanciaPerdido or 80.0
 
-        while activeClonesMax and #activeClonesMax > 0 and (GetGameTimer() - startTime) < duration do
+        while activeClonesMax and #activeClonesMax > 0 do
             Wait(100)
             local currentMaster = PlayerPedId()
-
-            if IsPedDeadOrDying(currentMaster, true) then
-                break
-            end
-
+            local masterDead = IsPedDeadOrDying(currentMaster, true)
             local curPos = GetEntityCoords(currentMaster)
             local curHeading = GetEntityHeading(currentMaster)
             local isMasterMoving = GetEntitySpeed(currentMaster) > 0.5
 
-            -- 1. Varredura inteligente de ameaças reais
+            -- 1. Filtra clones vivos vs mortos vs perdidos
+            local livingClones = {}
+            for _, cData in ipairs(clones) do
+                local clone = cData.entity
+                if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
+                    local clonePos = GetEntityCoords(clone)
+                    local distToMaster = #(clonePos - curPos)
+
+                    -- Se o jogador correu/viajou para longe (> 80m) e o clone se perdeu
+                    if distToMaster > maxLostDist and not masterDead then
+                        -- Libera o clone no servidor como qualquer NPC comum
+                        SetPedAsNoLongerNeeded(clone)
+                        SetBlockingOfNonTemporaryEvents(clone, false)
+                        SetPedCombatAttributes(clone, 46, false)
+                        TaskWanderStandard(clone, 10.0, 10)
+                    else
+                        table.insert(livingClones, cData)
+                    end
+                end
+                -- Se o clone morreu (IsPedDeadOrDying), ele NÃO é deletado; fica estirado no chão como defunto
+            end
+
+            clones = livingClones
+            activeClonesMax = {}
+            for _, c in ipairs(clones) do
+                table.insert(activeClonesMax, c.entity)
+            end
+
+            if #clones == 0 then
+                break
+            end
+
+            -- 2. Varredura inteligente de ameaças reais
             local threatList = {}
             local playerAimingEntity = nil
             local _, targetedEntity = GetEntityPlayerIsFreeAimingAt(PlayerId())
@@ -1975,12 +2032,12 @@ RegisterCommand('clonesmax', function()
                 table.sort(threatList, function(a, b) return a.dist < b.dist end)
             end
 
-            -- 2. Disparos coordenados dos clones contra as ameaças reais
+            -- 3. Disparos coordenados dos clones contra ameaças reais
             if #threatList > 0 then
                 local primaryThreat = threatList[1].ped
                 for idx, cData in ipairs(clones) do
                     local clone = cData.entity
-                    if DoesEntityExist(clone) then
+                    if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
                         local targetForThisClone = primaryThreat
                         if #threatList > 1 then
                             local targetIdx = ((idx - 1) % #threatList) + 1
@@ -1991,8 +2048,8 @@ RegisterCommand('clonesmax', function()
                             local cCoords = GetEntityCoords(clone)
                             local dToMaster = #(cCoords - curPos)
 
-                            if dToMaster > 18.0 then
-                                TaskGoStraightToCoord(clone, curPos.x, curPos.y, curPos.z, 3.2, 300, 0.0, 0.0)
+                            if dToMaster > 25.0 and not masterDead then
+                                TaskGoStraightToCoord(clone, curPos.x, curPos.y, curPos.z, 3.5, 300, 0.0, 0.0)
                             else
                                 if not cData.isShooting or math.random(1, 4) == 1 then
                                     TaskShootAtEntity(clone, targetForThisClone, 1500, GetHashKey("FIRING_PATTERN_BURST_FIRE_PISTOL"))
@@ -2003,10 +2060,10 @@ RegisterCommand('clonesmax', function()
                     end
                 end
             else
-                -- 3. Sem ameaças ativas: formação de multidão concêntrica escoltando o mestre
+                -- 4. Sem ameaças ativas: formação de multidão concêntrica escoltando o mestre
                 for _, cData in ipairs(clones) do
                     local clone = cData.entity
-                    if DoesEntityExist(clone) then
+                    if DoesEntityExist(clone) and not IsPedDeadOrDying(clone, true) then
                         if cData.isShooting then
                             ClearPedTasks(clone)
                             SetCurrentPedWeapon(clone, weaponHash, true)
@@ -2017,22 +2074,14 @@ RegisterCommand('clonesmax', function()
                         local targetSlot = curPos + vector3(-math.sin(rad) * cData.radius, math.cos(rad) * cData.radius, 0.0)
                         local clonePos = GetEntityCoords(clone)
                         local distToSlot = #(clonePos - targetSlot)
-                        local distToMaster = #(clonePos - curPos)
 
-                        if distToMaster > 25.0 then
-                            SetEntityCoordsNoOffset(clone, targetSlot.x, targetSlot.y, targetSlot.z, false, false, false)
-                            SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
-                            UseParticleFxAssetNextCall("core")
-                            StartParticleFxNonLoopedAtCoord("exp_grd_grenade_smoke", targetSlot.x, targetSlot.y, targetSlot.z, 0.0, 0.0, 0.0, 1.0, false, false, false)
+                        if isMasterMoving or distToSlot > 1.2 then
+                            local moveSpeed = isMasterMoving and (GetEntitySpeed(currentMaster) > 4.0 and 3.8 or 2.3) or 1.8
+                            TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, moveSpeed, 300, 0.0, 0.0)
                         else
-                            if isMasterMoving or distToSlot > 1.2 then
-                                local moveSpeed = isMasterMoving and (GetEntitySpeed(currentMaster) > 4.0 and 3.5 or 2.2) or 1.8
-                                TaskGoStraightToCoord(clone, targetSlot.x, targetSlot.y, targetSlot.z, moveSpeed, 300, 0.0, 0.0)
-                            else
-                                SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
-                                if GetSelectedPedWeapon(clone) ~= weaponHash then
-                                    SetCurrentPedWeapon(clone, weaponHash, true)
-                                end
+                            SetEntityHeading(clone, (curHeading + cData.angleOffset + 180.0) % 360.0)
+                            if GetSelectedPedWeapon(clone) ~= weaponHash then
+                                SetCurrentPedWeapon(clone, weaponHash, true)
                             end
                         end
                     end
@@ -2040,7 +2089,7 @@ RegisterCommand('clonesmax', function()
             end
         end
 
-        DispelClonesMax()
+        activeClonesMax = nil
     end)
 end, false)
 

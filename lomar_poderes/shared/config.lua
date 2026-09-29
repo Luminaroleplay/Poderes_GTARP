@@ -130,19 +130,22 @@ Config.EscudoMistico = {
 }
 
 Config.ClonesSombra = {
-    Quantidade = 4, -- 4 clones formando um círculo protetor de 360°
-    DuracaoMs = 35000, -- 35 segundos de proteção ativa ao redor do jogador
-    RaioCirculo = 2.4 -- distância do círculo protetor ao redor do personagem
+    Quantidade = 4,              -- 4 clones formando um círculo protetor de 360°
+    RaioCirculo = 2.4,           -- Distância do círculo protetor ao redor do personagem
+    Vida = 200,                  -- Vida de cada clone (morrem com tiros como qualquer NPC)
+    DistanciaPerdido = 75.0      -- Se o jogador se afastar mais que isso, o clone se perde no servidor como NPC comum
 }
 
 Config.ClonesMax = {
     Quantidade = 20,              -- Multidão de 20 clones protetores
     RaioInterno = 2.6,            -- Anel interno (8 clones)
     RaioExterno = 5.0,            -- Anel externo (12 clones)
-    DuracaoMs = 50000,            -- 50 segundos de escolta armada
+    Vida = 200,                   -- Vida de cada clone (morrem com tiros como qualquer NPC)
+    Colete = 50,                  -- Colete balístico de proteção
     Arma = "WEAPON_COMBATPISTOL", -- Arma de fogo dos clones (ex: WEAPON_COMBATPISTOL, WEAPON_MICROSMG, WEAPON_CARBINERIFLE)
     Precisao = 75,                -- Precisão de tiro dos clones (0-100)
-    RaioDeteccaoAmeaca = 35.0     -- Distância máxima para detectar e abrir fogo contra inimigos
+    RaioDeteccaoAmeaca = 35.0,    -- Distância máxima para detectar e abrir fogo contra inimigos
+    DistanciaPerdido = 80.0       -- Se o jogador se afastar mais que isso, o clone se perde no servidor como NPC comum
 }
 
 Config.BuracoNegro = {
